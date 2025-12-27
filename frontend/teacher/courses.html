@@ -230,14 +230,15 @@
             
             try {
                 const students = await API.get('/api/teacher/all-students');
-                displayStudentsForEnrollment(students);
+                const enrolledStudentIds = await API.get(`/api/teacher/course/${courseId}/enrolled-students`);
+                displayStudentsForEnrollment(students, enrolledStudentIds);
             } catch (error) {
                 console.error('Failed to load students:', error);
                 showNotification('Failed to load students', 'danger');
             }
         }
 
-        function displayStudentsForEnrollment(students) {
+        function displayStudentsForEnrollment(students, enrolledStudentIds = []) {
             if (!students || students.length === 0) {
                 document.getElementById('studentsListContainer').innerHTML = `
                     <div class="text-center text-muted">
@@ -250,17 +251,40 @@
             
             document.getElementById('studentsListContainer').innerHTML = `
                 <div class="list-group">
-                    ${students.map(student => `
-                        <div class="list-group-item d-flex justify-content-between align-items-center">
-                            <div>
-                                <h6 class="mb-1">${student.full_name}</h6>
-                                <small class="text-muted">${student.email}</small>
-                            </div>
-                            <button class="btn btn-sm btn-primary" onclick="addStudentToCourse(${student.id}, '${student.full_name}')">
-                                <i class="fas fa-plus me-1"></i>Add
-                            </button>
-                        </div>
-                    `).join('')}
+                    ${students.map(student => {
+                        const isEnrolled = enrolledStudentIds.includes(student.id);
+                        if (isEnrolled) {
+                            return `
+                                <div class="list-group-item d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h6 class="mb-1">${student.full_name}</h6>
+                                        <small class="text-muted">${student.email}</small>
+                                        <span class="badge bg-success ms-2">Enrolled</span>
+                                    </div>
+                                    <div class="btn-group" role="group">
+                                        <button class="btn btn-sm btn-secondary" disabled>
+                                            <i class="fas fa-check me-1"></i>Added
+                                        </button>
+                                        <button class="btn btn-sm btn-danger" onclick="removeStudentFromCourse(${student.id}, '${student.full_name}')">
+                                            <i class="fas fa-trash me-1"></i>Delete
+                                        </button>
+                                    </div>
+                                </div>
+                            `;
+                        } else {
+                            return `
+                                <div class="list-group-item d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h6 class="mb-1">${student.full_name}</h6>
+                                        <small class="text-muted">${student.email}</small>
+                                    </div>
+                                    <button class="btn btn-sm btn-primary" onclick="addStudentToCourse(${student.id}, '${student.full_name}')">
+                                        <i class="fas fa-plus me-1"></i>Add
+                                    </button>
+                                </div>
+                            `;
+                        }
+                    }).join('')}
                 </div>
             `;
         }
@@ -288,10 +312,41 @@
                 
                 // Refresh the student list
                 const students = await API.get('/api/teacher/all-students');
-                displayStudentsForEnrollment(students);
+                const enrolledStudentIds = await API.get(`/api/teacher/course/${currentEnrollCourseId}/enrolled-students`);
+                displayStudentsForEnrollment(students, enrolledStudentIds);
             } catch (error) {
                 console.error('Enrollment error:', error);
                 showNotification(`Failed to enroll student: ${error.message}`, 'danger');
+            }
+        }
+
+        async function removeStudentFromCourse(studentId, studentName) {
+            if (!confirm(`Are you sure you want to remove ${studentName} from this course?`)) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`http://127.0.0.1:8000/api/teacher/course/${currentEnrollCourseId}/remove-student/${studentId}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Authorization': `Bearer ${Auth.getToken()}`
+                    }
+                });
+                
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.detail || 'Failed to remove student');
+                }
+                
+                showNotification(`✅ ${studentName} removed from course!`, 'success');
+                
+                // Refresh the student list
+                const students = await API.get('/api/teacher/all-students');
+                const enrolledStudentIds = await API.get(`/api/teacher/course/${currentEnrollCourseId}/enrolled-students`);
+                displayStudentsForEnrollment(students, enrolledStudentIds);
+            } catch (error) {
+                console.error('Remove student error:', error);
+                showNotification(`Failed to remove student: ${error.message}`, 'danger');
             }
         }
 

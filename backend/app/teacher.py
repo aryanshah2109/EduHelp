@@ -347,3 +347,68 @@ async def enroll_student(
     db.refresh(enrollment)
     
     return {"message": f"Student enrolled successfully", "enrollment_id": enrollment.id}
+
+@router.get("/course/{course_id}/enrolled-students")
+async def get_enrolled_students(
+    course_id: int,
+    current_user: models.User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    if current_user.role != "teacher":
+        raise HTTPException(status_code=403, detail="Not authorized")
+    
+    # Verify teacher owns the course
+    course = db.query(models.Course).filter(models.Course.id == course_id).first()
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found")
+    
+    teacher = db.query(models.Teacher).filter(models.Teacher.user_id == current_user.id).first()
+    if course.teacher_id != teacher.id:
+        raise HTTPException(status_code=403, detail="Not authorized to view this course")
+    
+    # Get enrolled students
+    enrollments = db.query(models.Enrollment).filter(
+        models.Enrollment.course_id == course_id
+    ).all()
+    
+    enrolled_student_ids = [enrollment.student_id for enrollment in enrollments]
+    
+    return enrolled_student_ids
+
+@router.delete("/course/{course_id}/remove-student/{student_id}")
+async def remove_student_from_course(
+    course_id: int,
+    student_id: int,
+    current_user: models.User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    if current_user.role != "teacher":
+        raise HTTPException(status_code=403, detail="Not authorized")
+    
+    # Verify teacher owns the course
+    course = db.query(models.Course).filter(models.Course.id == course_id).first()
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found")
+    
+    teacher = db.query(models.Teacher).filter(models.Teacher.user_id == current_user.id).first()
+    if course.teacher_id != teacher.id:
+        raise HTTPException(status_code=403, detail="Not authorized to modify this course")
+    
+    # Check if student exists
+    student = db.query(models.Student).filter(models.Student.id == student_id).first()
+    if not student:
+        raise HTTPException(status_code=404, detail="Student not found")
+    
+    # Find and delete enrollment
+    enrollment = db.query(models.Enrollment).filter(
+        models.Enrollment.course_id == course_id,
+        models.Enrollment.student_id == student_id
+    ).first()
+    
+    if not enrollment:
+        raise HTTPException(status_code=404, detail="Student is not enrolled in this course")
+    
+    db.delete(enrollment)
+    db.commit()
+    
+    return {"message": "Student removed from course successfully"}
