@@ -114,26 +114,140 @@ class API {
 
 // Utility functions
 function showNotification(message, type = 'info') {
-    // Remove any existing alerts first
-    const existingAlerts = document.querySelectorAll('.alert');
-    existingAlerts.forEach(alert => alert.remove());
+    // Remove any existing notification first
+    const existingNotifications = document.querySelectorAll('.custom-notification');
+    existingNotifications.forEach(notif => {
+        if (notif.parentNode) notif.remove();
+    });
     
-    const alertDiv = document.createElement('div');
-    alertDiv.className = `alert alert-${type} alert-dismissible fade show position-fixed`;
-    alertDiv.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
-    alertDiv.innerHTML = `
-        ${message}
-        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    // Create notification container
+    const notificationDiv = document.createElement('div');
+    notificationDiv.className = 'custom-notification';
+    
+    // Style the notification
+    const bgColor = {
+        'success': '#d4edda',
+        'danger': '#f8d7da',
+        'warning': '#fff3cd',
+        'info': '#d1ecf1',
+        'primary': '#cfe2ff'
+    }[type] || '#d1ecf1';
+    
+    const borderColor = {
+        'success': '#c3e6cb',
+        'danger': '#f5c6cb',
+        'warning': '#ffeaa7',
+        'info': '#bee5eb',
+        'primary': '#b6d4fe'
+    }[type] || '#bee5eb';
+    
+    const textColor = {
+        'success': '#155724',
+        'danger': '#721c24',
+        'warning': '#856404',
+        'info': '#0c5460',
+        'primary': '#084298'
+    }[type] || '#0c5460';
+    
+    notificationDiv.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        z-index: 9999;
+        min-width: 350px;
+        padding: 15px 20px;
+        background-color: ${bgColor};
+        border: 1px solid ${borderColor};
+        border-radius: 4px;
+        color: ${textColor};
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-weight: 500;
+        animation: slideIn 0.3s ease-out;
+        cursor: pointer;
     `;
     
-    document.body.appendChild(alertDiv);
+    // Create close button
+    const closeBtn = document.createElement('button');
+    closeBtn.innerHTML = '&times;';
+    closeBtn.style.cssText = `
+        background: none;
+        border: none;
+        color: ${textColor};
+        font-size: 24px;
+        cursor: pointer;
+        padding: 0;
+        margin-left: 15px;
+        line-height: 1;
+    `;
     
-    // Auto remove after 5 seconds
-    setTimeout(() => {
-        if (alertDiv.parentNode) {
-            alertDiv.remove();
+    // Create message span
+    const messageSpan = document.createElement('span');
+    messageSpan.innerHTML = message;
+    messageSpan.style.flex = '1';
+    
+    // Add elements to notification
+    notificationDiv.appendChild(messageSpan);
+    notificationDiv.appendChild(closeBtn);
+    document.body.appendChild(notificationDiv);
+    
+    // Function to remove notification with animation
+    const removeNotification = () => {
+        if (notificationDiv._timeoutId) {
+            clearTimeout(notificationDiv._timeoutId);
         }
-    }, 5000);
+        notificationDiv.style.animation = 'slideOut 0.3s ease-out';
+        setTimeout(() => {
+            if (notificationDiv.parentNode) {
+                notificationDiv.remove();
+            }
+        }, 300);
+    };
+    
+    
+    // Auto remove after 15 seconds
+    notificationDiv._timeoutId = setTimeout(removeNotification, 15000);
+    
+    // Close button click handler ONLY
+    closeBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        removeNotification();
+    });
+    
+    // Add CSS animations if not already in document
+    if (!document.getElementById('notification-animations')) {
+        const styleEl = document.createElement('style');
+        styleEl.id = 'notification-animations';
+        styleEl.textContent = `
+            @keyframes slideIn {
+                from {
+                    transform: translateX(400px);
+                    opacity: 0;
+                }
+                to {
+                    transform: translateX(0);
+                    opacity: 1;
+                }
+            }
+            
+            @keyframes slideOut {
+                from {
+                    transform: translateX(0);
+                    opacity: 1;
+                }
+                to {
+                    transform: translateX(400px);
+                    opacity: 0;
+                }
+            }
+        `;
+        document.head.appendChild(styleEl);
+    }
+    
+    // Store reference for debugging
+    window.__lastNotification = notificationDiv;
 }
 
 function formatDate(dateString) {

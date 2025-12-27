@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Query
 from sqlalchemy.orm import Session
 from typing import List, Optional
 
@@ -121,6 +121,41 @@ async def upload_resource(
     
     return resource
 
+@router.delete("/resources/{resource_id}")
+async def delete_resource(
+    resource_id: int,
+    current_user: models.User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    if current_user.role != "teacher":
+        raise HTTPException(status_code=403, detail="Not authorized")
+    
+    resource = db.query(models.Resource).filter(models.Resource.id == resource_id).first()
+    if not resource:
+        raise HTTPException(status_code=404, detail="Resource not found")
+    
+    # Verify the teacher owns this course
+    course = db.query(models.Course).filter(models.Course.id == resource.course_id).first()
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found")
+    
+    teacher = db.query(models.Teacher).filter(models.Teacher.user_id == current_user.id).first()
+    if course.teacher_id != teacher.id:
+        raise HTTPException(status_code=403, detail="Not authorized to delete this resource")
+    
+    # Delete the file from disk
+    try:
+        if os.path.exists(resource.file_path):
+            os.remove(resource.file_path)
+    except Exception as e:
+        print(f"Warning: Could not delete file {resource.file_path}: {e}")
+    
+    # Delete from database
+    db.delete(resource)
+    db.commit()
+    
+    return {"message": "Resource deleted successfully"}
+
 @router.get("/analytics/{course_id}")
 async def get_course_analytics(
     course_id: int,
@@ -188,6 +223,43 @@ async def create_assignment(
     
     return db_assignment
 
+@router.get("/resources")
+async def get_course_resources(
+    course_id: int = Query(...),
+    current_user: models.User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    if current_user.role != "teacher":
+        raise HTTPException(status_code=403, detail="Not authorized")
+    
+    course = db.query(models.Course).filter(models.Course.id == course_id).first()
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found")
+    
+    # Verify the teacher owns this course
+    if course.teacher_id != db.query(models.Teacher).filter(models.Teacher.user_id == current_user.id).first().id:
+        raise HTTPException(status_code=403, detail="Not authorized to view this course's resources")
+    
+    resources = db.query(models.Resource).filter(models.Resource.course_id == course_id).all()
+    return {
+        "course": {
+            "id": course.id,
+            "title": course.title,
+            "description": course.description
+        },
+        "resources": [
+            {
+                "id": resource.id,
+                "title": resource.title,
+                "description": resource.description,
+                "resource_type": resource.resource_type,
+                "file_path": resource.file_path,
+                "created_at": resource.uploaded_at
+            }
+            for resource in resources
+        ]
+    }
+
 @router.get("/courses")
 async def get_teacher_courses(
     current_user: models.User = Depends(get_current_active_user),
@@ -210,3 +282,68 @@ async def get_teacher_courses(
         }
         for course in courses
     ]
+
+@router.get("/all-students")
+async def get_all_students(
+    current_user: models.User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    if current_user.role != "teacher":
+        raise HTTPException(status_code=403, detail="Not authorized")
+    
+    students = db.query(models.Student).all()
+    return [
+        {
+            "id": student.id,
+            "user_id": student.user_id,
+            "full_name": student.user.full_name,
+            "email": student.user.email,
+            "username": student.user.username
+        }
+        for student in students
+    ]
+
+@router.post("/enroll-student")
+async def enroll_student(
+    course_id: int = Form(...),
+    student_id: int = Form(...),
+    current_user: models.User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    if current_user.role != "teacher":
+        raise HTTPException(status_code=403, detail="Not authorized")
+    
+    # Verify teacher owns the course
+    course = db.query(models.Course).filter(models.Course.id == course_id).first()
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found")
+    
+    teacher = db.query(models.Teacher).filter(models.Teacher.user_id == current_user.id).first()
+    if course.teacher_id != teacher.id:
+        raise HTTPException(status_code=403, detail="Not authorized to enroll students in this course")
+    
+    # Check if student exists
+    student = db.query(models.Student).filter(models.Student.id == student_id).first()
+    if not student:
+        raise HTTPException(status_code=404, detail="Student not found")
+    
+    # Check if already enrolled
+    existing = db.query(models.Enrollment).filter(
+        models.Enrollment.course_id == course_id,
+        models.Enrollment.student_id == student_id
+    ).first()
+    
+    if existing:
+        raise HTTPException(status_code=400, detail="Student already enrolled in this course")
+    
+    # Create enrollment
+    enrollment = models.Enrollment(
+        course_id=course_id,
+        student_id=student_id
+    )
+    
+    db.add(enrollment)
+    db.commit()
+    db.refresh(enrollment)
+    
+    return {"message": f"Student enrolled successfully", "enrollment_id": enrollment.id}

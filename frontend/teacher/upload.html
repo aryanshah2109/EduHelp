@@ -33,6 +33,12 @@
                             </a>
                         </li>
                         <li class="nav-item">
+                            <a class="nav-link" href="resources.html">
+                                <i class="fas fa-folder me-2"></i>
+                                Course Resources
+                            </a>
+                        </li>
+                        <li class="nav-item">
                             <a class="nav-link active" href="upload.html">
                                 <i class="fas fa-upload me-2"></i>
                                 Upload Resources
@@ -73,17 +79,17 @@
                             <div class="card-body">
                                 <form id="uploadResourceForm">
                                     <div class="mb-3">
-                                        <label for="resourceTitle" class="form-label">Resource Title</label>
-                                        <input type="text" class="form-control" id="resourceTitle" required>
+                                        <label for="title" class="form-label">Resource Title</label>
+                                        <input type="text" class="form-control" id="title" name="title" required>
                                     </div>
                                     <div class="mb-3">
-                                        <label for="resourceDescription" class="form-label">Description</label>
-                                        <textarea class="form-control" id="resourceDescription" rows="3"></textarea>
+                                        <label for="description" class="form-label">Description</label>
+                                        <textarea class="form-control" id="description" name="description" rows="3"></textarea>
                                     </div>
                                     <div class="row">
                                         <div class="col-md-6 mb-3">
-                                            <label for="resourceType" class="form-label">Resource Type</label>
-                                            <select class="form-select" id="resourceType" required>
+                                            <label for="resource_type" class="form-label">Resource Type</label>
+                                            <select class="form-select" id="resource_type" name="resource_type" required>
                                                 <option value="">Select type</option>
                                                 <option value="pdf">PDF Document</option>
                                                 <option value="video">Video</option>
@@ -93,16 +99,16 @@
                                             </select>
                                         </div>
                                         <div class="col-md-6 mb-3">
-                                            <label for="courseSelect" class="form-label">Course</label>
-                                            <select class="form-select" id="courseSelect" required>
+                                            <label for="course_id" class="form-label">Course</label>
+                                            <select class="form-select" id="course_id" name="course_id" required>
                                                 <option value="">Select course</option>
                                                 <!-- Courses will be loaded here -->
                                             </select>
                                         </div>
                                     </div>
                                     <div class="mb-3">
-                                        <label for="resourceFile" class="form-label">File</label>
-                                        <input type="file" class="form-control" id="resourceFile" required>
+                                        <label for="file" class="form-label">File</label>
+                                        <input type="file" class="form-control" id="file" name="file" required>
                                         <div class="form-text">
                                             Supported formats: PDF, MP4, DOC, PPT, ZIP (Max 50MB)
                                         </div>
@@ -166,11 +172,14 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="../js/utils.js"></script>
     <script src="../js/auth.js"></script>
+    <script src="../js/utils.js"></script>
+    <script src="../js/auth.js"></script>
     <script src="../js/teacher.js"></script>
+    <script src="../js/resources.js"></script>
     <script>
-        
-        document.addEventListener('DOMContentLoaded', function () {
+        document.addEventListener('DOMContentLoaded', function() {
             redirectIfNotLoggedIn();
+            // Check if user is a teacher
             if (Auth.getUserRole() !== 'teacher') {
                 showNotification('Access denied. Redirecting to login...', 'danger');
                 setTimeout(() => {
@@ -178,54 +187,7 @@
                 }, 2000);
                 return;
             }
-            // Load page-specific content
-            loadTeacherCourses();
         });
-
-        async function loadTeacherCoursesForUpload() {
-            try {
-                const courses = await API.get('/api/teacher/courses');
-                const courseSelect = document.getElementById('courseSelect');
-                
-                courseSelect.innerHTML = '<option value="">Select course</option>' +
-                    courses.map(course => `
-                        <option value="${course.id}">${course.title}</option>
-                    `).join('');
-            } catch (error) {
-                console.error('Failed to load courses:', error);
-            }
-        }
-
-        function setupUploadForm() {
-            const form = document.getElementById('uploadResourceForm');
-            form.addEventListener('submit', async function(e) {
-                e.preventDefault();
-                
-                const formData = new FormData();
-                formData.append('file', document.getElementById('resourceFile').files[0]);
-                formData.append('title', document.getElementById('resourceTitle').value);
-                formData.append('description', document.getElementById('resourceDescription').value);
-                formData.append('resource_type', document.getElementById('resourceType').value);
-                formData.append('course_id', document.getElementById('courseSelect').value);
-
-                try {
-                    await API.upload('/api/teacher/resources', formData);
-                    showNotification('Resource uploaded successfully!', 'success');
-                    form.reset();
-                } catch (error) {
-                    console.error('Upload failed:', error);
-                    showNotification('Failed to upload resource.', 'danger');
-                }
-            });
-        }
-
-        function createAssignment() {
-            showNotification('Assignment creation feature coming soon!', 'info');
-        }
-
-        function viewAllResources() {
-            showNotification('Resource management feature coming soon!', 'info');
-        }
     </script>
 </body>
 </html>

@@ -1,9 +1,28 @@
+async function loadStudentName() {
+    try {
+        const userInfo = await API.get('/auth/me');
+        const studentNameElements = document.querySelectorAll('#studentName');
+        studentNameElements.forEach(el => {
+            el.textContent = userInfo.full_name || 'Student';
+        });
+    } catch (error) {
+        console.error('Error loading student name:', error);
+    }
+}
+
 async function loadStudentDashboard() {
     try {
         const dashboardData = await API.get('/api/student/dashboard');
         displayDashboardData(dashboardData);
     } catch (error) {
-        showNotification('Failed to load dashboard data', 'danger');
+        console.error('Dashboard error:', error);
+        // Only show error if we're on the dashboard page
+        const coursesList = document.getElementById('coursesList');
+        if (coursesList) {
+            showNotification('Failed to load dashboard data', 'danger');
+        }
+        // Still allow page to display without data
+        loadStudentName();
     }
 }
 
@@ -161,7 +180,7 @@ function displayStudentCourses(courses) {
                     </div>
                     
                     <div class="d-grid gap-2">
-                        <button class="btn btn-outline-primary btn-sm" onclick="viewCourseResources(${courseData.course.id})">
+                        <button class="btn btn-outline-primary btn-sm" onclick="viewCourseResources(${courseData.course.id}, '${escapeHtml(courseData.course.title)}')">
                             <i class="fas fa-folder-open me-1"></i>Resources
                         </button>
                         <button class="btn btn-outline-secondary btn-sm" onclick="viewCourseAssignments(${courseData.course.id})">
@@ -174,12 +193,18 @@ function displayStudentCourses(courses) {
     `).join('');
 }
 
-function viewCourseResources(courseId) {
-    showNotification(`Loading resources for course ${courseId}...`, 'info');
-    // Implementation for viewing course resources
-    setTimeout(() => {
-        showNotification('Resource viewing feature coming soon!', 'info');
-    }, 1000);
+function viewCourseResources(courseId, courseName) {
+    // Store the course ID and name in session storage
+    sessionStorage.setItem('viewingCourseId', courseId);
+    sessionStorage.setItem('viewingCourseName', courseName);
+    // Navigate to resources page
+    window.location.href = 'resources.html';
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
 }
 
 function viewCourseAssignments(courseId) {
@@ -194,7 +219,35 @@ function exploreCourses() {
     showNotification('Course exploration feature coming soon!', 'info');
 }
 
-// Setup logout button
+async function loadStudentProfile() {
+    try {
+        const dashboardData = await API.get('/api/student/dashboard');
+        displayStudentProfile(dashboardData);
+    } catch (error) {
+        console.error('Profile error:', error);
+        showNotification('Failed to load profile data', 'danger');
+    }
+}
+
+function displayStudentProfile(data) {
+    // Update profile information
+    const coursesCount = document.getElementById('coursesCount');
+    const assignmentsCount = document.getElementById('assignmentsCount');
+    const attendanceRate = document.getElementById('attendanceRate');
+    
+    if (coursesCount) {
+        coursesCount.textContent = data.enrollments.length;
+    }
+    if (assignmentsCount) {
+        assignmentsCount.textContent = data.recent_assignments.length;
+    }
+    if (attendanceRate && data.attendance.length > 0) {
+        const avgAttendance = data.attendance.reduce((sum, item) => sum + item.attendance_rate, 0) / data.attendance.length;
+        attendanceRate.textContent = `${(avgAttendance * 100).toFixed(1)}%`;
+    }
+}
+
+// Setup logout button and load student name on all pages
 document.addEventListener('DOMContentLoaded', function() {
     const logoutBtn = document.getElementById('logoutBtn');
     if (logoutBtn) {
@@ -203,7 +256,12 @@ document.addEventListener('DOMContentLoaded', function() {
             Auth.logout();
         });
     }
-    // Load initial dashboard data
+    // Load initial setup
     redirectIfNotLoggedIn();
-    loadStudentDashboard();
+    // Load student name on all pages
+    loadStudentName();
+    // Load dashboard data only if dashboard elements exist
+    if (document.getElementById('coursesList')) {
+        loadStudentDashboard();
+    }
 });

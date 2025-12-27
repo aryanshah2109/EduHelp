@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from typing import List
 
@@ -213,3 +213,51 @@ async def get_student_assignments(
         }
         for submission in submissions
     ]
+
+@router.get("/course-resources")
+async def get_course_resources(
+    course_id: int = Query(...),
+    current_user: models.User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    if current_user.role != "student":
+        raise HTTPException(status_code=403, detail="Not authorized")
+    
+    # Verify student is enrolled in this course
+    student = db.query(models.Student).filter(models.Student.user_id == current_user.id).first()
+    if not student:
+        raise HTTPException(status_code=404, detail="Student profile not found")
+    
+    enrollment = db.query(models.Enrollment).filter(
+        models.Enrollment.student_id == student.id,
+        models.Enrollment.course_id == course_id
+    ).first()
+    
+    if not enrollment:
+        raise HTTPException(status_code=403, detail="Not enrolled in this course")
+    
+    # Get course and resources
+    course = db.query(models.Course).filter(models.Course.id == course_id).first()
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found")
+    
+    resources = db.query(models.Resource).filter(models.Resource.course_id == course_id).all()
+    
+    return {
+        "course": {
+            "id": course.id,
+            "title": course.title,
+            "description": course.description
+        },
+        "resources": [
+            {
+                "id": resource.id,
+                "title": resource.title,
+                "description": resource.description,
+                "resource_type": resource.resource_type,
+                "file_path": resource.file_path,
+                "created_at": resource.uploaded_at
+            }
+            for resource in resources
+        ]
+    }

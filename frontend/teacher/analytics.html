@@ -35,6 +35,12 @@
                             </a>
                         </li>
                         <li class="nav-item">
+                            <a class="nav-link" href="resources.html">
+                                <i class="fas fa-folder me-2"></i>
+                                Course Resources
+                            </a>
+                        </li>
+                        <li class="nav-item">
                             <a class="nav-link" href="upload.html">
                                 <i class="fas fa-upload me-2"></i>
                                 Upload Resources
@@ -58,13 +64,38 @@
 
             <!-- Main content -->
             <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
-                <div
-                    class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-                    <h1 class="h2">Course Analytics</h1>
-                    <div class="btn-toolbar mb-2 mb-md-0">
-                        <select class="form-select form-select-sm" id="courseSelector" onchange="loadCourseAnalytics()">
-                            <option value="">Select a course...</option>
-                        </select>
+                <div class="pt-3 pb-2 mb-3 border-bottom">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h1 class="h2 mb-2">Course Analytics</h1>
+                            <span class="me-3">Welcome, <strong id="teacherName">Teacher</strong></span>
+                        </div>
+                        <div id="topCourseSelector" style="min-width: 250px; display: none;">
+                            <label class="form-label mb-1 small">Select Course:</label>
+                            <select class="form-select" id="topCourse" onchange="loadCourseAnalytics()">
+                                <option value="">-- Select a course --</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Course Selector - Centered -->
+                <div id="courseSelectorContainer">
+                    <div class="text-center mt-5">
+                        <i class="fas fa-chart-line fa-4x text-primary mb-3 d-block"></i>
+                        <h3 class="mb-3">Select a Course to View Analytics</h3>
+                        <div class="row justify-content-center">
+                            <div class="col-md-6">
+                                <div class="dashboard-card">
+                                    <div class="card-body">
+                                        <label for="courseSelector" class="form-label">Choose a Course:</label>
+                                        <select class="form-select form-select-lg" id="courseSelector" onchange="loadCourseAnalytics()">
+                                            <option value="">-- Select a course --</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -83,7 +114,7 @@
                                             </div>
                                         </div>
                                         <div class="col-auto">
-                                            <i class="fas fa-users fa-2x text-gray-300"></i>
+                                            <i class="fas fa-users fa-2x text-primary opacity-50"></i>
                                         </div>
                                     </div>
                                 </div>
@@ -102,7 +133,7 @@
                                             </div>
                                         </div>
                                         <div class="col-auto">
-                                            <i class="fas fa-chart-line fa-2x text-gray-300"></i>
+                                            <i class="fas fa-chart-line fa-2x text-success opacity-50"></i>
                                         </div>
                                     </div>
                                 </div>
@@ -114,14 +145,14 @@
                                 <div class="card-body">
                                     <div class="row no-gutters align-items-center">
                                         <div class="col mr-2">
-                                            <div class="text-xs font-weight-bold text-info text-uppercase mb-1">
+                                            <div class="text-xs font-weight-bold text-danger text-uppercase mb-1">
                                                 At-Risk Students
                                             </div>
                                             <div class="h5 mb-0 font-weight-bold text-gray-800" id="atRiskStudents">0
                                             </div>
                                         </div>
                                         <div class="col-auto">
-                                            <i class="fas fa-exclamation-triangle fa-2x text-gray-300"></i>
+                                            <i class="fas fa-exclamation-triangle fa-2x text-danger opacity-50"></i>
                                         </div>
                                     </div>
                                 </div>
@@ -140,7 +171,7 @@
                                             </div>
                                         </div>
                                         <div class="col-auto">
-                                            <i class="fas fa-calendar-check fa-2x text-gray-300"></i>
+                                            <i class="fas fa-calendar-check fa-2x text-warning opacity-50"></i>
                                         </div>
                                     </div>
                                 </div>
@@ -178,7 +209,7 @@
                     <div class="dashboard-card mt-4">
                         <div class="card-header">
                             <h6 class="m-0 font-weight-bold">
-                                <i class="fas fa-brain me-2"></i>AI Teaching Insights
+                                <i class="fas fa-lightbulb me-2"></i>AI Teaching Insights & Recommendations
                             </h6>
                         </div>
                         <div class="card-body">
@@ -187,13 +218,6 @@
                             </div>
                         </div>
                     </div>
-                </div>
-
-                <!-- No Course Selected Message -->
-                <div id="noCourseSelected" class="text-center mt-5">
-                    <i class="fas fa-chart-bar fa-4x text-muted mb-3"></i>
-                    <h3 class="text-muted">Select a Course</h3>
-                    <p class="text-muted">Please select a course from the dropdown to view analytics.</p>
                 </div>
             </main>
         </div>
@@ -207,6 +231,7 @@
 
         document.addEventListener('DOMContentLoaded', function () {
             redirectIfNotLoggedIn();
+            loadTeacherName();
             if (Auth.getUserRole() !== 'teacher') {
                 showNotification('Access denied. Redirecting to login...', 'danger');
                 setTimeout(() => {
@@ -214,26 +239,32 @@
                 }, 2000);
                 return;
             }
-            // Load page-specific content
-            loadTeacherCourses();
+            // Load courses for dropdown
+            loadTeacherCoursesForAnalytics();
         });
 
+        const atRiskCount = 0; // Will be set in displayCourseAnalytics
 
         async function loadTeacherCoursesForAnalytics() {
             try {
                 const courses = await API.get('/api/teacher/courses');
                 const courseSelector = document.getElementById('courseSelector');
+                const topCourse = document.getElementById('topCourse');
 
-                courseSelector.innerHTML = '<option value="">Select a course...</option>' +
+                const options = '<option value="">-- Select a course --</option>' +
                     courses.map(course => `
                         <option value="${course.id}">${course.title}</option>
                     `).join('');
+
+                courseSelector.innerHTML = options;
+                topCourse.innerHTML = options;
 
                 // Check if course_id is in URL parameters
                 const urlParams = new URLSearchParams(window.location.search);
                 const courseId = urlParams.get('course_id');
                 if (courseId) {
                     courseSelector.value = courseId;
+                    topCourse.value = courseId;
                     loadCourseAnalytics();
                 }
             } catch (error) {
@@ -242,16 +273,29 @@
         }
 
         async function loadCourseAnalytics() {
-            const courseId = document.getElementById('courseSelector').value;
+            // Get course ID from either dropdown (they should be synced)
+            let courseId = document.getElementById('topCourse').value;
+            if (!courseId) {
+                courseId = document.getElementById('courseSelector').value;
+            }
+            
+            // Sync both dropdowns with the selected value
+            document.getElementById('courseSelector').value = courseId;
+            document.getElementById('topCourse').value = courseId;
+            
+            const topCourseDropdown = document.getElementById('topCourseSelector');
+            
             if (!courseId) {
                 document.getElementById('courseOverview').style.display = 'none';
-                document.getElementById('noCourseSelected').style.display = 'block';
+                document.getElementById('courseSelectorContainer').style.display = 'block';
+                topCourseDropdown.style.display = 'none';
                 return;
             }
 
             try {
                 const analytics = await API.get(`/api/teacher/analytics/${courseId}`);
                 displayCourseAnalytics(analytics);
+                topCourseDropdown.style.display = 'block';
             } catch (error) {
                 console.error('Failed to load analytics:', error);
                 showNotification('Failed to load course analytics.', 'danger');
@@ -259,7 +303,7 @@
         }
 
         function displayCourseAnalytics(analytics) {
-            document.getElementById('noCourseSelected').style.display = 'none';
+            document.getElementById('courseSelectorContainer').style.display = 'none';
             document.getElementById('courseOverview').style.display = 'block';
 
             // Update overview cards
@@ -268,8 +312,8 @@
             const avgPerformance = analytics.analytics.reduce((sum, a) => sum + a.assignment_avg, 0) / analytics.analytics.length;
             document.getElementById('avgPerformance').textContent = `${avgPerformance.toFixed(1)}%`;
 
-            const atRiskCount = analytics.analytics.filter(a => a.risk_prediction.risk_level === 'high').length;
-            document.getElementById('atRiskStudents').textContent = atRiskCount;
+            const riskCount = analytics.analytics.filter(a => a.risk_prediction.risk_level === 'high').length;
+            document.getElementById('atRiskStudents').textContent = riskCount;
 
             const avgAttendance = analytics.analytics.reduce((sum, a) => sum + a.attendance_rate, 0) / analytics.analytics.length;
             document.getElementById('avgAttendance').textContent = `${(avgAttendance * 100).toFixed(1)}%`;
@@ -285,16 +329,16 @@
                     </td>
                     <td>${student.student.email}</td>
                     <td>
-                        <div class="progress" style="height: 6px;">
+                        <div class="progress" style="height: 8px; margin-bottom: 4px;">
                             <div class="progress-bar bg-success" style="width: ${student.attendance_rate * 100}%"></div>
                         </div>
                         <small>${(student.attendance_rate * 100).toFixed(1)}%</small>
                     </td>
                     <td>
-                        <div class="progress" style="height: 6px;">
+                        <div class="progress" style="height: 8px; margin-bottom: 4px;">
                             <div class="progress-bar bg-info" style="width: ${student.assignment_avg}%"></div>
                         </div>
-                        <small>${student.assignment_avg}%</small>
+                        <small>${student.assignment_avg.toFixed(1)}%</small>
                     </td>
                     <td>
                         <span class="badge bg-${student.risk_prediction.risk_level === 'high' ? 'danger' : student.risk_prediction.risk_level === 'medium' ? 'warning' : 'success'}">
@@ -313,33 +357,43 @@
             document.getElementById('teacherInsights').innerHTML = `
                 <div class="row">
                     <div class="col-md-6">
-                        <h6>Class Overview</h6>
-                        <p><strong>Course:</strong> ${analytics.course.title}</p>
-                        <p><strong>Total Students:</strong> ${analytics.analytics.length}</p>
-                        <p><strong>At-Risk Students:</strong> <span class="risk-high">${atRiskCount}</span></p>
-                        <p><strong>Average Performance:</strong> ${avgPerformance.toFixed(1)}%</p>
+                        <h6 class="mb-3"><i class="fas fa-bar-chart me-2"></i>Class Performance Summary</h6>
+                        <ul class="list-unstyled">
+                            <li class="mb-2"><strong>Course:</strong> ${analytics.course.title}</li>
+                            <li class="mb-2"><strong>Total Students:</strong> ${analytics.analytics.length}</li>
+                            <li class="mb-2"><strong>Average Performance:</strong> <span class="badge bg-info">${avgPerformance.toFixed(1)}%</span></li>
+                            <li class="mb-2"><strong>Average Attendance:</strong> <span class="badge bg-success">${(avgAttendance * 100).toFixed(1)}%</span></li>
+                            <li class="mb-2"><strong>At-Risk Students:</strong> <span class="badge bg-${riskCount > 0 ? 'danger' : 'success'}">${riskCount}</span></li>
+                        </ul>
                     </div>
                     <div class="col-md-6">
-                        <h6>Recommendations</h6>
+                        <h6 class="mb-3"><i class="fas fa-lightbulb me-2"></i>AI Recommendations</h6>
                         <ul class="list-unstyled">
-                            <li><i class="fas fa-bullhorn text-warning me-2"></i>Reach out to ${atRiskCount} at-risk students</li>
-                            <li><i class="fas fa-video text-info me-2"></i>Create additional video resources</li>
-                            <li><i class="fas fa-users text-success me-2"></i>Schedule group study sessions</li>
-                            ${atRiskCount > 0 ? '<li><i class="fas fa-envelope text-danger me-2"></i>Send progress reports to parents/guardians</li>' : ''}
+                            ${riskCount > 0 ? `
+                            <li class="mb-2"><i class="fas fa-phone text-danger me-2"></i><strong>Outreach:</strong> Contact ${riskCount} at-risk student${riskCount !== 1 ? 's' : ''} for support</li>
+                            ` : `
+                            <li class="mb-2"><i class="fas fa-star text-warning me-2"></i><strong>Engagement:</strong> All students performing well</li>
+                            `}
+                            <li class="mb-2"><i class="fas fa-video text-info me-2"></i><strong>Resources:</strong> Add more video materials to support learning</li>
+                            <li class="mb-2"><i class="fas fa-users text-success me-2"></i><strong>Collaboration:</strong> Schedule peer study sessions</li>
+                            ${avgPerformance < 70 ? `
+                            <li class="mb-2"><i class="fas fa-graduation-cap text-primary me-2"></i><strong>Review:</strong> Consider covering key concepts again</li>
+                            ` : ''}
                         </ul>
                     </div>
                 </div>
-                ${atRiskCount > 0 ? `
-                <div class="alert alert-warning mt-3">
+                <hr>
+                ${riskCount > 0 ? `
+                <div class="alert alert-warning">
                     <i class="fas fa-exclamation-triangle me-2"></i>
-                    <strong>AI Alert:</strong> ${atRiskCount} students in this course are identified as high-risk. 
-                    Consider providing additional support and resources.
+                    <strong>⚠️ AI Alert:</strong> ${riskCount} student${riskCount !== 1 ? 's are' : ' is'} identified as high-risk. 
+                    We recommend scheduling one-on-one meetings to understand their challenges and provide targeted support.
                 </div>
                 ` : `
-                <div class="alert alert-success mt-3">
+                <div class="alert alert-success">
                     <i class="fas fa-check-circle me-2"></i>
-                    <strong>Great News:</strong> All students in this course are performing well. 
-                    Consider introducing advanced topics to challenge them further.
+                    <strong>✅ Excellent Progress:</strong> All students are performing well in this course. 
+                    Consider introducing more advanced topics or increasing the difficulty level to further engage your students.
                 </div>
                 `}
             `;

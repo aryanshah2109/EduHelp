@@ -33,6 +33,12 @@
                             </a>
                         </li>
                         <li class="nav-item">
+                            <a class="nav-link" href="resources.html">
+                                <i class="fas fa-folder me-2"></i>
+                                Course Resources
+                            </a>
+                        </li>
+                        <li class="nav-item">
                             <a class="nav-link" href="upload.html">
                                 <i class="fas fa-upload me-2"></i>
                                 Upload Resources
@@ -116,14 +122,41 @@
         </div>
     </div>
 
+    <!-- Enroll Students Modal -->
+    <div class="modal fade" id="enrollStudentsModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Enroll Students in <span id="enrollCourseTitle"></span></h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="studentsListContainer">
+                        <div class="text-center">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="../js/utils.js"></script>
     <script src="../js/auth.js"></script>
     <script src="../js/teacher.js"></script>
     <script>
+        // Store current enrollment course ID
+        let currentEnrollCourseId = null;
         
         document.addEventListener('DOMContentLoaded', function () {
             redirectIfNotLoggedIn();
+            loadTeacherName();
             if (Auth.getUserRole() !== 'teacher') {
                 showNotification('Access denied. Redirecting to login...', 'danger');
                 setTimeout(() => {
@@ -168,6 +201,12 @@
                                 </small>
                             </div>
                             <div class="d-grid gap-2">
+                                <button class="btn btn-outline-primary btn-sm" onclick="enrollStudents(${course.id}, '${course.title}')">
+                                    <i class="fas fa-user-plus me-1"></i>Enroll Students
+                                </button>
+                                <button class="btn btn-outline-primary btn-sm" onclick="viewCourseResources(${course.id})">
+                                    <i class="fas fa-folder me-1"></i>View Resources
+                                </button>
                                 <button class="btn btn-outline-primary btn-sm" onclick="viewCourseAnalytics(${course.id})">
                                     <i class="fas fa-chart-bar me-1"></i>Analytics
                                 </button>
@@ -179,6 +218,84 @@
                     </div>
                 </div>
             `).join('');
+        }
+
+        async function enrollStudents(courseId, courseTitle) {
+            currentEnrollCourseId = courseId;
+            document.getElementById('enrollCourseTitle').textContent = courseTitle;
+            
+            const modal = new bootstrap.Modal(document.getElementById('enrollStudentsModal'));
+            modal.show();
+            
+            try {
+                const students = await API.get('/api/teacher/all-students');
+                displayStudentsForEnrollment(students);
+            } catch (error) {
+                console.error('Failed to load students:', error);
+                showNotification('Failed to load students', 'danger');
+            }
+        }
+
+        function displayStudentsForEnrollment(students) {
+            if (!students || students.length === 0) {
+                document.getElementById('studentsListContainer').innerHTML = `
+                    <div class="text-center text-muted">
+                        <i class="fas fa-users fa-3x mb-3 d-block"></i>
+                        <p>No students found in the database</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            document.getElementById('studentsListContainer').innerHTML = `
+                <div class="list-group">
+                    ${students.map(student => `
+                        <div class="list-group-item d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="mb-1">${student.full_name}</h6>
+                                <small class="text-muted">${student.email}</small>
+                            </div>
+                            <button class="btn btn-sm btn-primary" onclick="addStudentToCourse(${student.id}, '${student.full_name}')">
+                                <i class="fas fa-plus me-1"></i>Add
+                            </button>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+        }
+
+        async function addStudentToCourse(studentId, studentName) {
+            try {
+                const formData = new FormData();
+                formData.append('course_id', currentEnrollCourseId);
+                formData.append('student_id', studentId);
+                
+                const response = await fetch('http://127.0.0.1:8000/api/teacher/enroll-student', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${Auth.getToken()}`
+                    },
+                    body: formData
+                });
+                
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.detail || 'Failed to enroll student');
+                }
+                
+                showNotification(`✅ ${studentName} enrolled successfully!`, 'success');
+                
+                // Refresh the student list
+                const students = await API.get('/api/teacher/all-students');
+                displayStudentsForEnrollment(students);
+            } catch (error) {
+                console.error('Enrollment error:', error);
+                showNotification(`Failed to enroll student: ${error.message}`, 'danger');
+            }
+        }
+
+        function viewCourseResources(courseId) {
+            window.location.href = `resources.html?course_id=${courseId}`;
         }
 
         function viewCourseAnalytics(courseId) {

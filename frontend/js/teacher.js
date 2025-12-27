@@ -1,12 +1,50 @@
+async function loadTeacherName() {
+    try {
+        const userInfo = await API.get('/auth/me');
+        const teacherNameElements = document.querySelectorAll('#teacherName');
+        teacherNameElements.forEach(el => {
+            el.textContent = userInfo.full_name || 'Teacher';
+        });
+    } catch (error) {
+        console.error('Error loading teacher name:', error);
+    }
+}
+
+async function loadCoursesForDropdown() {
+    try {
+        const courses = await API.get('/api/teacher/courses');
+        const courseSelect = document.getElementById('course_id');
+        
+        if (courseSelect && courses && courses.length > 0) {
+            // Clear existing options except the first one
+            courseSelect.innerHTML = '<option value="">Select course</option>';
+            
+            // Add course options
+            courses.forEach(course => {
+                const option = document.createElement('option');
+                option.value = course.id;
+                option.textContent = course.title;
+                courseSelect.appendChild(option);
+            });
+        }
+    } catch (error) {
+        console.error('Error loading courses for dropdown:', error);
+    }
+}
+
 async function loadTeacherDashboard() {
     try {
         const dashboardData = await API.get('/api/teacher/dashboard');
         displayTeacherDashboard(dashboardData);
     } catch (error) {
         console.error('Dashboard error:', error);
-        showNotification('Failed to load dashboard data', 'danger');
+        // Only show error if we're on the dashboard page
+        const coursesList = document.getElementById('teacherCoursesList');
+        if (coursesList) {
+            showNotification('Failed to load dashboard data', 'danger');
+        }
         // Still allow page to display without data
-        document.getElementById('teacherName').textContent = 'Teacher';
+        loadTeacherName();
     }
 }
 
@@ -208,20 +246,33 @@ function manageCourse(courseId) {
 }
 
 // Resource upload functionality
-async function uploadResource() {
+// Resource upload functionality - FIXED VERSION
+async function uploadResource(event) {
+    // ADD THIS LINE to prevent page reload
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation(); // Also prevent event bubbling
+    }
+    
     const form = document.getElementById('uploadResourceForm');
+    if (!form) return;
+    
     const formData = new FormData(form);
     
     try {
-        await API.upload('/api/teacher/resources', formData);
-        showNotification('Resource uploaded successfully!', 'success');
+        console.log('Uploading resource...');
+        const response = await API.upload('/api/teacher/resources', formData);
+        console.log('Upload response:', response);
+        showNotification('✅ Resource uploaded successfully!', 'success');
         form.reset();
+        loadCoursesForDropdown(); // Refresh the dropdown
     } catch (error) {
-        showNotification('Failed to upload resource', 'danger');
+        console.error('Upload error:', error);
+        showNotification(`❌ Failed to upload resource: ${error.message}`, 'danger');
     }
 }
 
-// Setup logout button
+// Setup logout button and load teacher name on all pages
 document.addEventListener('DOMContentLoaded', function() {
     const logoutBtn = document.getElementById('logoutBtn');
     if (logoutBtn) {
@@ -230,7 +281,23 @@ document.addEventListener('DOMContentLoaded', function() {
             Auth.logout();
         });
     }
-    // Load initial dashboard data
+    
+    // Setup upload form submit handler
+    const uploadForm = document.getElementById('uploadResourceForm');
+    if (uploadForm) {
+        uploadForm.addEventListener('submit', uploadResource);
+    }
+    
+    // Load initial setup
     redirectIfNotLoggedIn();
-    loadTeacherDashboard();
+    // Load teacher name on all pages
+    loadTeacherName();
+    // Load courses for dropdown if on upload page
+    if (document.getElementById('course_id')) {
+        loadCoursesForDropdown();
+    }
+    // Load dashboard data only if dashboard elements exist
+    if (document.getElementById('teacherCoursesList')) {
+        loadTeacherDashboard();
+    }
 });
