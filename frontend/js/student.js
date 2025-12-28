@@ -35,9 +35,6 @@ function displayDashboardData(data) {
     const avgAttendance = data.attendance.reduce((sum, item) => sum + item.attendance_rate, 0) / data.attendance.length;
     document.getElementById('attendanceRate').textContent = `${(avgAttendance * 100).toFixed(1)}%`;
     
-    // Update pending assignments (simplified)
-    document.getElementById('pendingAssignments').textContent = data.recent_assignments.length;
-    
     // Display courses
     const coursesList = document.getElementById('coursesList');
     coursesList.innerHTML = data.enrollments.map(enrollment => `
@@ -47,18 +44,6 @@ function displayDashboardData(data) {
                 <small class="text-muted">${enrollment.course.description}</small>
             </div>
             <span class="badge bg-primary">Enrolled</span>
-        </div>
-    `).join('');
-    
-    // Display assignments
-    const assignmentsList = document.getElementById('assignmentsList');
-    assignmentsList.innerHTML = data.recent_assignments.map(assignment => `
-        <div class="d-flex align-items-center mb-3">
-            <div class="flex-grow-1">
-                <h6 class="mb-1">${assignment.title}</h6>
-                <small class="text-muted">Due: ${formatDate(assignment.due_date)}</small>
-            </div>
-            <span class="badge bg-warning">Pending</span>
         </div>
     `).join('');
     
@@ -232,14 +217,11 @@ async function loadStudentProfile() {
 function displayStudentProfile(data) {
     // Update profile information
     const coursesCount = document.getElementById('coursesCount');
-    const assignmentsCount = document.getElementById('assignmentsCount');
+    const coursesCount = document.getElementById('coursesCount');
     const attendanceRate = document.getElementById('attendanceRate');
     
     if (coursesCount) {
         coursesCount.textContent = data.enrollments.length;
-    }
-    if (assignmentsCount) {
-        assignmentsCount.textContent = data.recent_assignments.length;
     }
     if (attendanceRate && data.attendance.length > 0) {
         const avgAttendance = data.attendance.reduce((sum, item) => sum + item.attendance_rate, 0) / data.attendance.length;

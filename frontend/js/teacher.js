@@ -75,7 +75,7 @@ function displayTeacherDashboard(data) {
                 <div class="flex-grow-1">
                     <h6 class="mb-1">${course.course.title}</h6>
                     <small class="text-muted">
-                        ${course.student_count} students • ${course.assignment_count} assignments • ${course.resource_count} resources
+                        ${course.student_count} students • ${course.resource_count} resources
                     </small>
                 </div>
                 <div>
@@ -120,7 +120,7 @@ function displayTeacherInsights(analytics) {
                 <p><strong>Total Students:</strong> ${analytics.analytics.length}</p>
                 <p><strong>At-Risk Students:</strong> <span class="risk-high">${atRiskCount}</span></p>
                 <p><strong>Average Performance:</strong> 
-                    ${(analytics.analytics.reduce((sum, a) => sum + a.assignment_avg, 0) / analytics.analytics.length).toFixed(1)}%
+                    ${(analytics.analytics.reduce((sum, a) => sum + a.attendance_rate, 0) / analytics.analytics.length * 100).toFixed(1)}%
                 </p>
             </div>
             <div class="col-md-6">

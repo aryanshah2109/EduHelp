@@ -310,7 +310,7 @@
             // Update overview cards
             document.getElementById('totalStudents').textContent = analytics.analytics.length;
 
-            const avgPerformance = analytics.analytics.reduce((sum, a) => sum + a.assignment_avg, 0) / analytics.analytics.length;
+            const avgPerformance = analytics.analytics.reduce((sum, a) => sum + a.attendance_rate, 0) / analytics.analytics.length;
             document.getElementById('avgPerformance').textContent = `${avgPerformance.toFixed(1)}%`;
 
             const riskCount = analytics.analytics.filter(a => a.risk_prediction.risk_level === 'high').length;
@@ -334,12 +334,6 @@
                             <div class="progress-bar bg-success" style="width: ${student.attendance_rate * 100}%"></div>
                         </div>
                         <small>${(student.attendance_rate * 100).toFixed(1)}%</small>
-                    </td>
-                    <td>
-                        <div class="progress" style="height: 8px; margin-bottom: 4px;">
-                            <div class="progress-bar bg-info" style="width: ${student.assignment_avg}%"></div>
-                        </div>
-                        <small>${student.assignment_avg.toFixed(1)}%</small>
                     </td>
                     <td>
                         <span class="badge bg-${student.risk_prediction.risk_level === 'high' ? 'danger' : student.risk_prediction.risk_level === 'medium' ? 'warning' : 'success'}">
