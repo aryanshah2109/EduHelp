@@ -12,6 +12,7 @@ body {
     background-color: #f8f9fc;
 }
 
+
 /* Password toggle styles */
 .password-input-group {
     position: relative;
@@ -48,6 +49,24 @@ body {
 input[type="password"], input[type="text"] {
     padding-right: 40px !important;
 }
+
+.nav-link{
+    font-size: 15px;
+    color:white !important;
+    margin-right:20px
+}
+
+.nav-link-index{
+    color:white !important;
+    font-size: 20px;
+    margin-right:20px;
+    text-decoration: none;
+}
+
+.nav-link-index:hover {
+    text-decoration: underline;
+}
+
 
 .nav-link:hover {
     color: white;
