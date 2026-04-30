@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Alumni Dashboard - EduHelp</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="../css/style.css" rel="stylesheet">
+    <link rel="icon" href="../../images/favicon.png" type="image/png">
+    <style>
+        .stat-card {
+            transition: transform 0.3s ease;
+            cursor: pointer;
+        }
+        .stat-card:hover {
+            transform: translateY(-5px);
+        }
+        .welcome-banner {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 30px;
+        }
+        .recent-chat-item {
+            transition: background 0.3s ease;
+        }
+        .recent-chat-item:hover {
+            background: #f8f9fa;
+            cursor: pointer;
+        }
+        .unread-badge {
+            background: #dc3545;
+            color: white;
+            border-radius: 50%;
+            padding: 2px 8px;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid">
+        <div class="row">
+            <!-- Sidebar -->
+            <nav class="col-md-3 col-lg-2 d-md-block sidebar collapse">
+                <div class="position-sticky pt-3">
+                    <div class="text-center mb-4">
+                        <i class="fas fa-graduation-cap fa-2x text-white mb-2"></i>
+                        <h5 class="text-white">EduHelp</h5>
+                    </div>
+                    
+                    <ul class="nav flex-column">
+                        <li class="nav-item">
+                            <a class="nav-link active" href="dashboard.html">
+                                <i class="fas fa-tachometer-alt me-2"></i>
+                                Dashboard
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="chat.html">
+                                <i class="fas fa-comments me-2"></i>
+                                Messages
+                                <span id="unreadBadge" class="badge bg-danger ms-2" style="display: none;">0</span>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="profile.html">
+                                <i class="fas fa-user me-2"></i>
+                                Profile
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="../index.html" id="logoutBtn">
+                                <i class="fas fa-sign-out-alt me-2"></i>
+                                Logout
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+            </nav>
+
+            <!-- Main content -->
+            <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
+                <div class="welcome-banner">
+                    <h1 class="display-5 fw-bold">Welcome back, <span id="alumniName">Alumni</span>!</h1>
+                    <p class="lead">Connect, mentor, and support current students and teachers.</p>
+                </div>
+
+                <!-- Stats Cards -->
+                <div class="row mb-4">
+                    <div class="col-md-4">
+                        <div class="dashboard-card stat-card" onclick="window.location.href='chat.html'">
+                            <div class="card-body">
+                                <div class="row align-items-center">
+                                    <div class="col">
+                                        <h6 class="text-muted mb-1">Unread Messages</h6>
+                                        <h2 class="mb-0" id="unreadCount">0</h2>
+                                    </div>
+                                    <div class="col-auto">
+                                        <i class="fas fa-envelope fa-3x text-primary opacity-50"></i>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-4">
+                        <div class="dashboard-card stat-card" onclick="window.location.href='chat.html'">
+                            <div class="card-body">
+                                <div class="row align-items-center">
+                                    <div class="col">
+                                        <h6 class="text-muted mb-1">Connections</h6>
+                                        <h2 class="mb-0" id="connectionsCount">0</h2>
+                                    </div>
+                                    <div class="col-auto">
+                                        <i class="fas fa-users fa-3x text-success opacity-50"></i>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-4">
+                        <div class="dashboard-card stat-card" onclick="window.location.href='profile.html'">
+                            <div class="card-body">
+                                <div class="row align-items-center">
+                                    <div class="col">
+                                        <h6 class="text-muted mb-1">Profile Views</h6>
+                                        <h2 class="mb-0" id="profileViews">0</h2>
+                                    </div>
+                                    <div class="col-auto">
+                                        <i class="fas fa-eye fa-3x text-info opacity-50"></i>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Recent Conversations -->
+                <div class="dashboard-card">
+                    <div class="card-header">
+                        <h6 class="m-0 font-weight-bold">
+                            <i class="fas fa-clock me-2"></i>Recent Conversations
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <div id="recentConversations">
+                            <div class="text-center py-4">
+                                <div class="spinner-border text-primary" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
+                                <p class="mt-2">Loading conversations...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Quick Actions -->
+                <div class="row mt-4">
+                    <div class="col-md-6">
+                        <div class="dashboard-card">
+                            <div class="card-header">
+                                <h6 class="m-0 font-weight-bold">
+                                    <i class="fas fa-graduation-cap me-2"></i>Connect with Students
+                                </h6>
+                            </div>
+                            <div class="card-body">
+                                <p>Share your experience and mentor current students.</p>
+                                <button class="btn btn-primary" onclick="window.location.href='chat.html?tab=students'">
+                                    <i class="fas fa-comments me-2"></i>Start Chatting
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-6">
+                        <div class="dashboard-card">
+                            <div class="card-header">
+                                <h6 class="m-0 font-weight-bold">
+                                    <i class="fas fa-chalkboard-teacher me-2"></i>Connect with Teachers
+                                </h6>
+                            </div>
+                            <div class="card-body">
+                                <p>Stay connected with former teachers and colleagues.</p>
+                                <button class="btn btn-success" onclick="window.location.href='chat.html?tab=teachers'">
+                                    <i class="fas fa-comments me-2"></i>Start Chatting
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="../js/utils.js"></script>
+    <script src="../js/auth.js"></script>
+    <script src="js/alumni.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            redirectIfNotLoggedIn();
+            if (Auth.getUserRole() !== 'alumni') {
+                showNotification('Access denied. Redirecting to login...', 'danger');
+                setTimeout(() => {
+                    window.location.href = '../login.html';
+                }, 2000);
+                return;
+            }
+            loadAlumniDashboard();
+            loadUnreadCount();
+            
+            // Refresh unread count every 30 seconds
+            setInterval(loadUnreadCount, 30000);
+        });
+        
+        async function loadUnreadCount() {
+            try {
+                const response = await API.get('/api/chat/unread-count');
+                const unreadCount = response.unread_count;
+                document.getElementById('unreadCount').textContent = unreadCount;
+                const badge = document.getElementById('unreadBadge');
+                if (unreadCount > 0) {
+                    badge.style.display = 'inline-block';
+                    badge.textContent = unreadCount > 99 ? '99+' : unreadCount;
+                } else {
+                    badge.style.display = 'none';
+                }
+            } catch (error) {
+                console.error('Failed to load unread count:', error);
+            }
+        }
+    </script>
+</body>
+</html>

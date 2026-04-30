@@ -10,13 +10,20 @@ class User(Base):
     email = Column(String, unique=True, index=True)
     username = Column(String, unique=True, index=True)
     hashed_password = Column(String)
-    role = Column(String)  # "student" or "teacher"
+    role = Column(String)  # "student", "teacher", or "alumni"
     full_name = Column(String)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     
     # Relationships
     student_profile = relationship("Student", back_populates="user", uselist=False, cascade="all, delete-orphan")
     teacher_profile = relationship("Teacher", back_populates="user", uselist=False, cascade="all, delete-orphan")
+    alumni_profile = relationship("Alumni", back_populates="user", uselist=False, cascade="all, delete-orphan")
+    
+    # Chat relationships
+    sent_messages = relationship("ChatMessage", foreign_keys="ChatMessage.sender_id", back_populates="sender")
+    received_messages = relationship("ChatMessage", foreign_keys="ChatMessage.receiver_id", back_populates="receiver")
+    conversations_as_user1 = relationship("ChatConversation", foreign_keys="ChatConversation.user1_id", back_populates="user1")
+    conversations_as_user2 = relationship("ChatConversation", foreign_keys="ChatConversation.user2_id", back_populates="user2")
 
 class Student(Base):
     __tablename__ = "students"
@@ -40,6 +47,21 @@ class Teacher(Base):
     
     user = relationship("User", back_populates="teacher_profile")
     courses = relationship("Course", back_populates="teacher")
+
+class Alumni(Base):
+    __tablename__ = "alumni"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"))
+    graduation_year = Column(Integer)
+    degree = Column(String)
+    current_company = Column(String)
+    job_title = Column(String)
+    bio = Column(Text, nullable=True)
+    profile_picture = Column(String, nullable=True)
+    linkedin_url = Column(String, nullable=True)
+    
+    user = relationship("User", back_populates="alumni_profile")
 
 class Course(Base):
     __tablename__ = "courses"
@@ -116,3 +138,32 @@ class Attendance(Base):
     status = Column(String)  # present, absent, late
     
     enrollment = relationship("Enrollment", back_populates="attendance")
+
+class ChatConversation(Base):
+    __tablename__ = "chat_conversations"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user1_id = Column(Integer, ForeignKey("users.id"))
+    user2_id = Column(Integer, ForeignKey("users.id"))
+    last_message = Column(Text, nullable=True)
+    last_message_time = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    user1 = relationship("User", foreign_keys=[user1_id], back_populates="conversations_as_user1")
+    user2 = relationship("User", foreign_keys=[user2_id], back_populates="conversations_as_user2")
+    messages = relationship("ChatMessage", back_populates="conversation", cascade="all, delete-orphan")
+
+class ChatMessage(Base):
+    __tablename__ = "chat_messages"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    conversation_id = Column(Integer, ForeignKey("chat_conversations.id"))
+    sender_id = Column(Integer, ForeignKey("users.id"))
+    receiver_id = Column(Integer, ForeignKey("users.id"))
+    message = Column(Text)
+    is_read = Column(Boolean, default=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    conversation = relationship("ChatConversation", back_populates="messages")
+    sender = relationship("User", foreign_keys=[sender_id], back_populates="sent_messages")
+    receiver = relationship("User", foreign_keys=[receiver_id], back_populates="received_messages")

@@ -5,6 +5,8 @@ function redirectBasedOnRole() {
     
     if (role === 'teacher') {
         window.location.href = 'teacher/dashboard.html';
+    } else if (role === 'alumni') {
+        window.location.href = 'alumni/dashboard.html';
     } else if (role === 'student') {
         window.location.href = 'student/dashboard.html';
     } else {

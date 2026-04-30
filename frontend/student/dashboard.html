@@ -49,6 +49,13 @@
                             </a>
                         </li>
                         <li class="nav-item">
+                            <a class="nav-link" href="chat.html">
+                                <i class="fas fa-comments me-2"></i>
+                                Messages
+                                <span id="unreadBadge" class="badge bg-danger ms-2" style="display: none;">0</span>
+                            </a>
+                        </li>
+                        <li class="nav-item">
                             <a class="nav-link" href="../index.html" id="logoutBtn">
                                 <i class="fas fa-sign-out-alt me-2"></i>
                                 Logout
@@ -60,8 +67,7 @@
 
             <!-- Main content -->
             <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
-                <div
-                    class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+                <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
                     <h1 class="h2">Student Dashboard</h1>
                     <div class="btn-toolbar mb-2 mb-md-0">
                         <span class="me-3">Welcome, <strong id="studentName">Student</strong></span>
@@ -106,8 +112,6 @@
                         </div>
                     </div>
 
-
-
                     <div class="col-xl-3 col-md-6 mb-4">
                         <div class="dashboard-card">
                             <div class="card-body">
@@ -141,8 +145,6 @@
                             </div>
                         </div>
                     </div>
-
-
                 </div>
 
                 <!-- AI Insights -->
@@ -170,20 +172,6 @@
     <script src="../js/utils.js"></script>
     <script src="../js/auth.js"></script>
     <script src="../js/student.js"></script>
-    <script>
-        document.addEventListener('DOMContentLoaded', function () {
-            redirectIfNotLoggedIn();
-            // Check if user is a student
-            if (Auth.getUserRole() !== 'student') {
-                showNotification('Access denied. Redirecting to login...', 'danger');
-                setTimeout(() => {
-                    window.location.href = '../login.html';
-                }, 2000);
-                return;
-            }
-            loadStudentDashboard();
-        });
-    </script>
 </body>
 
 </html>

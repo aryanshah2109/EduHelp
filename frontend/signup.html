@@ -27,6 +27,14 @@
         .password-toggle:hover {
             color: #495057;
         }
+        .role-info {
+            font-size: 12px;
+            color: #6c757d;
+            margin-top: 5px;
+        }
+        .role-info i {
+            margin-right: 5px;
+        }
     </style>
 </head>
 <body>
@@ -74,9 +82,14 @@
                                 <label for="role" class="form-label">I am a</label>
                                 <select class="form-select" id="role" name="role" required>
                                     <option value="">Select role</option>
-                                    <option value="student">Student</option>
-                                    <option value="teacher">Teacher</option>
+                                    <option value="student">Student - Current learner</option>
+                                    <option value="teacher">Teacher - Educator</option>
+                                    <option value="alumni">Alumni - Graduate</option>
                                 </select>
+                                <div class="role-info" id="roleInfo">
+                                    <i class="fas fa-info-circle"></i>
+                                    <span>Select your role to get started</span>
+                                </div>
                             </div>
                             
                             <button type="submit" class="btn btn-primary w-100 mb-3">Create Account</button>
@@ -93,5 +106,204 @@
 
     <script src="js/utils.js"></script>
     <script src="js/auth.js"></script>
+    <script>
+        // Role information display
+        const roleSelect = document.getElementById('role');
+        const roleInfo = document.getElementById('roleInfo');
+        
+        const roleDescriptions = {
+            'student': '📚 Access courses, track performance, and get AI-powered learning insights',
+            'teacher': '👨‍🏫 Create courses, upload resources, and manage student analytics',
+            'alumni': '🎓 Connect with students and teachers, share experience, and mentor others',
+            '': 'Select your role to see description'
+        };
+        
+        if (roleSelect) {
+            roleSelect.addEventListener('change', function() {
+                const role = this.value;
+                const description = roleDescriptions[role] || roleDescriptions[''];
+                roleInfo.innerHTML = `<i class="fas fa-info-circle"></i> ${description}`;
+            });
+        }
+        
+        // Password toggle
+        function togglePasswordVisibility(inputId, toggleId) {
+            const passwordInput = document.getElementById(inputId);
+            const toggleBtn = document.getElementById(toggleId);
+            
+            if (passwordInput.type === 'password') {
+                passwordInput.type = 'text';
+                toggleBtn.innerHTML = '<i class="fas fa-eye-slash"></i>';
+            } else {
+                passwordInput.type = 'password';
+                toggleBtn.innerHTML = '<i class="fas fa-eye"></i>';
+            }
+        }
+        
+        const togglePasswordSignup = document.getElementById('togglePasswordSignup');
+        if (togglePasswordSignup) {
+            togglePasswordSignup.addEventListener('click', function() {
+                togglePasswordVisibility('password', 'togglePasswordSignup');
+            });
+        }
+        
+        // Signup form handler with alumni support
+        const signupForm = document.getElementById('signupForm');
+        if (signupForm) {
+            signupForm.addEventListener('submit', async function(e) {
+                e.preventDefault();
+                
+                const formData = new FormData(this);
+                const userData = {
+                    email: formData.get('email'),
+                    username: formData.get('username'),
+                    password: formData.get('password'),
+                    full_name: formData.get('full_name'),
+                    role: formData.get('role')
+                };
+                
+                console.log('📝 Registration attempt with data:', userData);
+                
+                // Validation
+                if (userData.password.length < 6) {
+                    showNotification("Password must be at least 6 characters long.", "danger");
+                    return;
+                }
+                
+                if (userData.password.length > 72) {
+                    showNotification("Password too long. Maximum 72 characters allowed.", "danger");
+                    return;
+                }
+                
+                if (!userData.email || !userData.username || !userData.password || !userData.full_name || !userData.role) {
+                    showNotification("Please fill in all fields.", "danger");
+                    return;
+                }
+                
+                const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                if (!emailRegex.test(userData.email)) {
+                    showNotification("Please enter a valid email address.", "danger");
+                    return;
+                }
+                
+                const usernameRegex = /^[a-zA-Z0-9_]+$/;
+                if (!usernameRegex.test(userData.username)) {
+                    showNotification("Username can only contain letters, numbers, and underscores.", "danger");
+                    return;
+                }
+                
+                // Validate role
+                if (!['student', 'teacher', 'alumni'].includes(userData.role)) {
+                    showNotification("Please select a valid role.", "danger");
+                    return;
+                }
+                
+                try {
+                    console.log('📝 Making POST request to: http://127.0.0.1:8000/auth/register');
+                    
+                    const response = await fetch('http://127.0.0.1:8000/auth/register', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify(userData)
+                    });
+                    
+                    const responseText = await response.text();
+                    console.log('📊 Response:', response.status, responseText);
+                    
+                    if (!response.ok) {
+                        let errorDetail = `Registration failed with status ${response.status}`;
+                        try {
+                            const errorData = JSON.parse(responseText);
+                            errorDetail = errorData.detail || errorDetail;
+                        } catch (e) {
+                            errorDetail = responseText || errorDetail;
+                        }
+                        throw new Error(errorDetail);
+                    }
+                    
+                    const result = JSON.parse(responseText);
+                    console.log('✅ Registration success:', result);
+                    
+                    showNotification('Registration successful! Logging in...', 'success');
+                    
+                    // Auto-login after registration
+                    await autoLoginAfterSignup(userData.username, userData.password, userData.role);
+                    
+                } catch (error) {
+                    console.error('❌ Registration error:', error);
+                    showNotification(`Registration failed: ${error.message}`, 'danger');
+                }
+            });
+        }
+        
+        async function autoLoginAfterSignup(username, password, role) {
+            try {
+                const params = new URLSearchParams();
+                params.append('username', username);
+                params.append('password', password);
+                params.append('grant_type', 'password');
+                
+                console.log('🔐 Auto-login attempt with username:', username);
+                
+                const loginResponse = await fetch('http://127.0.0.1:8000/auth/token', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: params
+                });
+                
+                if (loginResponse.ok) {
+                    const loginData = await loginResponse.json();
+                    Auth.setToken(loginData.access_token);
+                    Auth.setUserRole(role);
+                    console.log('✅ Auto-login successful after registration');
+                    
+                    showNotification('Registration complete! Redirecting to dashboard...', 'success');
+                    setTimeout(() => {
+                        if (role === 'teacher') {
+                            window.location.href = '/teacher/dashboard.html';
+                        } else if (role === 'alumni') {
+                            window.location.href = '/alumni/dashboard.html';
+                        } else {
+                            window.location.href = '/student/dashboard.html';
+                        }
+                    }, 1500);
+                } else {
+                    console.error('❌ Auto-login failed');
+                    showNotification('Registration complete! Please login with your credentials.', 'info');
+                    setTimeout(() => {
+                        window.location.href = '/login.html';
+                    }, 2000);
+                }
+            } catch (error) {
+                console.error('❌ Auto-login error:', error);
+                showNotification('Registration complete! Please login with your credentials.', 'info');
+                setTimeout(() => {
+                    window.location.href = '/login.html';
+                }, 2000);
+            }
+        }
+        
+        // Test API connection on load
+        async function testApiConnection() {
+            try {
+                console.log('🔌 Testing API connection...');
+                const response = await fetch('http://127.0.0.1:8000/health');
+                if (response.ok) {
+                    console.log('✅ API is reachable');
+                } else {
+                    console.error('❌ API health check failed:', response.status);
+                }
+            } catch (error) {
+                console.error('❌ Cannot connect to API:', error.message);
+                showNotification('Cannot connect to server. Make sure backend is running on port 8000.', 'danger');
+            }
+        }
+        
+        testApiConnection();
+    </script>
 </body>
 </html>

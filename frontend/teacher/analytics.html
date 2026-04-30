@@ -54,6 +54,13 @@
                             </a>
                         </li>
                         <li class="nav-item">
+                            <a class="nav-link" href="chat.html">
+                                <i class="fas fa-comments me-2"></i>
+                                Messages
+                                <span id="unreadBadge" class="badge bg-danger ms-2" style="display: none;">0</span>
+                            </a>
+                        </li>
+                        <li class="nav-item">
                             <a class="nav-link" href="../index.html" id="logoutBtn">
                                 <i class="fas fa-sign-out-alt me-2"></i>
                                 Logout
@@ -90,7 +97,8 @@
                                 <div class="dashboard-card">
                                     <div class="card-body">
                                         <label for="courseSelector" class="form-label">Choose a Course:</label>
-                                        <select class="form-select form-select-lg" id="courseSelector" onchange="loadCourseAnalytics()">
+                                        <select class="form-select form-select-lg" id="courseSelector"
+                                            onchange="loadCourseAnalytics()">
                                             <option value="">-- Select a course --</option>
                                         </select>
                                     </div>
@@ -279,13 +287,13 @@
             if (!courseId) {
                 courseId = document.getElementById('courseSelector').value;
             }
-            
+
             // Sync both dropdowns with the selected value
             document.getElementById('courseSelector').value = courseId;
             document.getElementById('topCourse').value = courseId;
-            
+
             const topCourseDropdown = document.getElementById('topCourseSelector');
-            
+
             if (!courseId) {
                 document.getElementById('courseOverview').style.display = 'none';
                 document.getElementById('courseSelectorContainer').style.display = 'block';

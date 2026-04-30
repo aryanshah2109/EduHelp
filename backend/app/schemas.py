@@ -129,3 +129,52 @@ class PerformancePrediction(BaseModel):
     confidence: float
     risk_level: str
     recommendations: List[str]
+
+# Add these to your existing schemas.py
+
+class AlumniBase(BaseModel):
+    graduation_year: int
+    degree: str
+    current_company: str
+    job_title: str
+    bio: Optional[str] = None
+    linkedin_url: Optional[str] = None
+
+class AlumniCreate(AlumniBase):
+    user_id: int
+
+class AlumniUpdate(BaseModel):
+    graduation_year: Optional[int] = None
+    degree: Optional[str] = None
+    current_company: Optional[str] = None
+    job_title: Optional[str] = None
+    bio: Optional[str] = None
+    linkedin_url: Optional[str] = None
+
+class Alumni(AlumniBase):
+    id: int
+    user_id: int
+    profile_picture: Optional[str] = None
+    user: User
+    
+    class Config:
+        from_attributes = True
+
+class ChatMessageBase(BaseModel):
+    message: str
+
+class ChatMessageCreate(ChatMessageBase):
+    sender_id: int
+    receiver_id: int
+    conversation_id: int
+
+class ChatMessage(ChatMessageBase):
+    id: int
+    sender_id: int
+    receiver_id: int
+    conversation_id: int
+    is_read: bool
+    created_at: datetime
+    
+    class Config:
+        from_attributes = True

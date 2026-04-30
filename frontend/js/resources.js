@@ -16,21 +16,21 @@ async function loadCourseResources() {
         console.log('Loading resources for course:', courseId);
         const response = await API.get(`/api/teacher/resources?course_id=${courseId}`);
         console.log('Resources response:', response);
-        displayCourseResources(response);
+        await displayCourseResources(response);
     } catch (error) {
         console.error('Failed to load resources:', error);
         showNotification('Failed to load resources. Please try again.', 'danger');
     }
 }
 
-function displayCourseResources(data) {
+async function displayCourseResources(data) {
     const container = document.getElementById('resourcesContainer');
     const courseTitle = document.getElementById('courseTitle');
-    
+
     if (data && data.course) {
         courseTitle.textContent = data.course.title;
     }
-    
+
     if (!data || !data.resources || data.resources.length === 0) {
         container.innerHTML = `
             <div class="col-12 text-center">
@@ -46,7 +46,16 @@ function displayCourseResources(data) {
         `;
         return;
     }
-    
+
+    // Determine current user role so we only show delete button to teachers
+    let isTeacher = false;
+    try {
+        const me = await API.get('/auth/me');
+        if (me && me.role === 'teacher') isTeacher = true;
+    } catch (err) {
+        console.warn('Could not determine current user role for resource rendering', err);
+    }
+
     container.innerHTML = data.resources.map(resource => `
         <div class="col-md-6 col-lg-4 mb-4">
             <div class="dashboard-card h-100">
@@ -74,9 +83,9 @@ function displayCourseResources(data) {
                         <button class="btn btn-sm btn-primary" onclick="downloadResource('${resource.file_path}', '${resource.title}')">
                             <i class="fas fa-download me-1"></i>Download
                         </button>
-                        <button class="btn btn-sm btn-outline-secondary" onclick="deleteResource(${resource.id})">
+                        ${isTeacher ? `<button class="btn btn-sm btn-outline-secondary" onclick="deleteResource(${resource.id})">
                             <i class="fas fa-trash me-1"></i>Delete
-                        </button>
+                        </button>` : ''}
                     </div>
                 </div>
             </div>
@@ -141,7 +150,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Only load resources if we're on the resources.html page
     if (window.location.pathname.includes('resources.html')) {
         redirectIfNotLoggedIn();
-        loadTeacherName();
+        loadUserName();
         loadCourseResources();
         
         // Setup logout button
@@ -154,3 +163,17 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 });
+
+// Load current user's name into any present name elements
+async function loadUserName() {
+    try {
+        const me = await API.get('/auth/me');
+        if (!me) return;
+        const studentNameElements = document.querySelectorAll('#studentName');
+        studentNameElements.forEach(el => el.textContent = me.full_name || me.username || 'User');
+        const teacherNameElements = document.querySelectorAll('#teacherName');
+        teacherNameElements.forEach(el => el.textContent = me.full_name || me.username || 'User');
+    } catch (error) {
+        console.warn('Could not load user name:', error);
+    }
+}

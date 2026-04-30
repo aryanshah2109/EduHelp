@@ -8,6 +8,7 @@ import os
 
 # Import from current directory
 from . import models
+from . import alumni, chat
 from .database import engine, get_db
 from .schemas import UserCreate, Token
 from .auth import get_password_hash, authenticate_user, create_access_token, ACCESS_TOKEN_EXPIRE_MINUTES
@@ -17,71 +18,57 @@ models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="EduHelp API", version="1.0.0")
 
-# CORS middleware - allow all origins for development
+# CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allow all origins for development
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Import and include routers after app creation
+# Import and include routers
 from . import auth, student, teacher
 
 app.include_router(auth.router, prefix="/auth", tags=["authentication"])
 app.include_router(student.router, prefix="/api", tags=["student"])
 app.include_router(teacher.router, prefix="/api", tags=["teacher"])
+app.include_router(alumni.router, prefix="/api", tags=["alumni"])
+app.include_router(chat.router, prefix="/api", tags=["chat"])
 
-# Create uploads directory if it doesn't exist
+# Static files
 os.makedirs("uploads/resources", exist_ok=True)
-
-# Mount static files for uploaded resources
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
-# Serve frontend static files - REMOVE THIS FOR NOW to test
-# app.mount("/", StaticFiles(directory="../frontend", html=True), name="frontend")
 
+# ------------------ REGISTER ------------------
 @app.post("/auth/register")
 async def register(user: UserCreate, db: Session = Depends(get_db)):
-    print(f"🔐 Registration attempt for: {user.username}, {user.email}, role: {user.role}")
-    
+    print(f"🔐 Registration attempt for: {user.username}, role: {user.role}")
+
     try:
-        # Add reasonable password length validation
         if len(user.password) < 6:
-            raise HTTPException(
-                status_code=400, 
-                detail="Password too short. Minimum 6 characters required."
-            )
+            raise HTTPException(status_code=400, detail="Password too short")
 
         if len(user.password) > 72:
-            raise HTTPException(
-                status_code=400, 
-                detail="Password too long. Maximum 72 characters allowed."
-            )
-        
-        # Check if user exists
-        db_user = db.query(models.User).filter(models.User.username == user.username).first()
-        if db_user:
-            print(f"❌ Username {user.username} already exists")
+            raise HTTPException(status_code=400, detail="Password too long")
+
+        # Check duplicates
+        if db.query(models.User).filter(models.User.username == user.username).first():
             raise HTTPException(status_code=400, detail="Username already registered")
-        
-        db_user = db.query(models.User).filter(models.User.email == user.email).first()
-        if db_user:
-            print(f"❌ Email {user.email} already exists")
+
+        if db.query(models.User).filter(models.User.email == user.email).first():
             raise HTTPException(status_code=400, detail="Email already registered")
-        
-        # Validate role
-        if user.role not in ["student", "teacher"]:
-            raise HTTPException(status_code=400, detail="Role must be 'student' or 'teacher'")
-        
-        # Create user with password hashing
-        try:
-            hashed_password = get_password_hash(user.password)
-        except Exception as hash_error:
-            print(f"❌ Password hashing error: {hash_error}")
-            raise HTTPException(status_code=500, detail="Password processing error")
-        
+
+        # ✅ FIXED ROLE VALIDATION
+        if user.role not in ["student", "teacher", "alumni"]:
+            raise HTTPException(
+                status_code=400,
+                detail="Role must be 'student', 'teacher', or 'alumni'"
+            )
+
+        hashed_password = get_password_hash(user.password)
+
         db_user = models.User(
             email=user.email,
             username=user.username,
@@ -92,75 +79,56 @@ async def register(user: UserCreate, db: Session = Depends(get_db)):
         db.add(db_user)
         db.commit()
         db.refresh(db_user)
-        
-        print(f"✅ User created with ID: {db_user.id}")
-        
-        # Create profile based on role
+
+        # Create role profile
         if user.role == "student":
-            student_profile = models.Student(
-                user_id=db_user.id,
-                grade_level="Undergraduate",
-                department="General"
-            )
-            db.add(student_profile)
-            print("✅ Student profile created")
+            db.add(models.Student(user_id=db_user.id, grade_level="Undergraduate", department="General"))
+
         elif user.role == "teacher":
-            teacher_profile = models.Teacher(
+            db.add(models.Teacher(user_id=db_user.id, department="General", qualifications="Masters"))
+
+        elif user.role == "alumni":
+            db.add(models.Alumni(
                 user_id=db_user.id,
-                department="General",
-                qualifications="Masters Degree"
-            )
-            db.add(teacher_profile)
-            print("✅ Teacher profile created")
-        
+                graduation_year=2020,
+                degree="Not Specified"
+            ))
+
         db.commit()
-        
-        # After successful registration, also return user info
-        user_info = {
-            "id": db_user.id,
-            "username": db_user.username,
-            "email": db_user.email,
-            "full_name": db_user.full_name,
-            "role": db_user.role
-        }
-        
+
         return {
-            "message": "User created successfully", 
-            "user_id": db_user.id,
-            "username": db_user.username,
-            "role": user.role,
-            "user": user_info,
-            "success": True
+            "message": "User created successfully",
+            "user": {
+                "id": db_user.id,
+                "username": db_user.username,
+                "role": db_user.role
+            }
         }
-        
+
     except HTTPException:
         raise
     except Exception as e:
-        print(f"❌ Registration error: {str(e)}")
         db.rollback()
-        raise HTTPException(status_code=500, detail=f"Registration failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
+
+# ------------------ LOGIN ------------------
 @app.post("/auth/token", response_model=Token)
 async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
-    print(f"🔐 Login attempt for user: {form_data.username}")
-    
     user = authenticate_user(db, form_data.username, form_data.password)
+
     if not user:
-        print(f"❌ Authentication failed for user: {form_data.username}")
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect username or password",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    
-    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+        raise HTTPException(status_code=401, detail="Incorrect username or password")
+
     access_token = create_access_token(
-        data={"sub": user.username}, expires_delta=access_token_expires
+        data={"sub": user.username},
+        expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     )
-    
-    print(f"✅ Login successful for user: {form_data.username}, role: {user.role}")
+
     return {"access_token": access_token, "token_type": "bearer"}
 
+
+# ------------------ BASIC ROUTES ------------------
 @app.get("/")
 async def root():
     return {"message": "Welcome to EduHelp API"}
@@ -169,22 +137,21 @@ async def root():
 async def health_check():
     return {"status": "healthy"}
 
-# Add a test endpoint to verify the API is working
 @app.get("/test")
 async def test_endpoint():
-    return {"message": "API is working!", "timestamp": str(__import__('datetime').datetime.now())}
+    return {"message": "API working"}
 
-# Demo data creation endpoint
+
+# ------------------ SEED DEMO DATA ------------------
 @app.post("/seed-demo-data")
 async def seed_demo_data(db: Session = Depends(get_db)):
-    """Create demo data for testing - teacher with courses"""
+    """Create demo data for testing - teacher, student, and alumni"""
     try:
-        # Check if demo data already exists
-        existing_teacher = db.query(models.User).filter(models.User.username == "teacher1").first()
-        if existing_teacher:
+        # Prevent duplicate seeding
+        if db.query(models.User).filter(models.User.username == "teacher1").first():
             return {"message": "Demo data already exists"}
-        
-        # Create demo teacher
+
+        # ---------- TEACHER ----------
         teacher_user = models.User(
             email="teacher@eduhub.com",
             username="teacher1",
@@ -194,16 +161,16 @@ async def seed_demo_data(db: Session = Depends(get_db)):
         )
         db.add(teacher_user)
         db.flush()
-        
+
         teacher = models.Teacher(
             user_id=teacher_user.id,
             department="Computer Science",
-            qualifications="PhD in Computer Science"
+            qualifications="PhD"
         )
         db.add(teacher)
         db.flush()
-        
-        # Create demo student
+
+        # ---------- STUDENT ----------
         student_user = models.User(
             email="student@eduhub.com",
             username="student1",
@@ -213,7 +180,7 @@ async def seed_demo_data(db: Session = Depends(get_db)):
         )
         db.add(student_user)
         db.flush()
-        
+
         student = models.Student(
             user_id=student_user.id,
             grade_level="Undergraduate",
@@ -221,41 +188,66 @@ async def seed_demo_data(db: Session = Depends(get_db)):
         )
         db.add(student)
         db.flush()
-        
-        # Create demo courses
+
+        # ---------- ALUMNI ----------
+        alumni_user = models.User(
+            email="alumni@eduhub.com",
+            username="alumni1",
+            hashed_password=get_password_hash("password"),
+            full_name="John Smith",
+            role="alumni"
+        )
+        db.add(alumni_user)
+        db.flush()
+
+        alumni = models.Alumni(
+            user_id=alumni_user.id,
+            graduation_year=2020,
+            degree="BSc Computer Science",
+            current_company="Google",
+            job_title="Senior Software Engineer",
+            bio="Happy to mentor students",
+            linkedin_url="https://linkedin.com/in/johnsmith"
+        )
+        db.add(alumni)
+        db.flush()
+
+        # ---------- COURSES ----------
         course1 = models.Course(
             title="Introduction to Python",
-            description="Learn the basics of Python programming language",
+            description="Basics of Python",
             teacher_id=teacher.id
         )
         course2 = models.Course(
-            title="Web Development with Django",
-            description="Build web applications using Django framework",
+            title="Django Web Development",
+            description="Build web apps",
             teacher_id=teacher.id
         )
         db.add(course1)
         db.add(course2)
         db.flush()
-        
-        # Enroll student in courses
-        enrollment1 = models.Enrollment(
-            student_id=student.id,
-            course_id=course1.id
-        )
-        enrollment2 = models.Enrollment(
-            student_id=student.id,
-            course_id=course2.id
-        )
-        db.add(enrollment1)
-        db.add(enrollment2)
-        
+
+        # ---------- ENROLLMENTS ----------
+        db.add(models.Enrollment(student_id=student.id, course_id=course1.id))
+        db.add(models.Enrollment(student_id=student.id, course_id=course2.id))
+
         db.commit()
-        return {"message": "Demo data created successfully!", "teacher": "teacher1", "student": "student1"}
-    
+
+        return {
+            "message": "Demo data created successfully",
+            "login": {
+                "teacher": "teacher1 / password",
+                "student": "student1 / password",
+                "alumni": "alumni1 / password"
+            }
+        }
+
     except Exception as e:
         db.rollback()
         return {"error": str(e)}
 
+
+# ------------------ RUN ------------------
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="127.0.0.1", port=8000, reload=True)
