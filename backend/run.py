@@ -7,8 +7,6 @@ if __name__ == "__main__":
     # Set environment variables to avoid encoding issues
     os.environ["PYTHONUTF8"] = "1"
     os.environ["PYTHONIOENCODING"] = "utf-8"
-
-    subprocess.run([sys.executable, "update_db.py"])
     
     uvicorn.run(
         "app.main:app",

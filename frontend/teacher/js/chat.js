@@ -2,8 +2,7 @@
 let currentChatUser = null;
 let ws = null;
 let currentTab = 'alumni';
-let alumniList = [];
-let studentsList = [];
+let currentUserId = null;
 
 async function switchTab(tab) {
     currentTab = tab;
@@ -11,12 +10,11 @@ async function switchTab(tab) {
     // Update tab buttons
     document.getElementById('tabAlumni').classList.remove('active');
     document.getElementById('tabStudents').classList.remove('active');
-    document.getElementById(`tab${tab.charAt(0).toUpperCase() + tab.slice(1)}`).classList.add('active');
-    
-    // Load users based on tab
     if (tab === 'alumni') {
+        document.getElementById('tabAlumni').classList.add('active');
         await loadAlumniForTeacher();
     } else {
+        document.getElementById('tabStudents').classList.add('active');
         await loadStudentsForTeacher();
     }
 }
@@ -25,8 +23,8 @@ async function loadAlumniForTeacher() {
     try {
         console.log('Loading alumni list for teacher...');
         const response = await API.get('/api/chat/alumni');
-        alumniList = response;
-        displayContactsList(alumniList, 'alumni');
+        console.log('Alumni loaded:', response);
+        displayContactsList(response, 'alumni');
     } catch (error) {
         console.error('Failed to load alumni:', error);
         document.getElementById('usersList').innerHTML = `
@@ -45,8 +43,8 @@ async function loadStudentsForTeacher() {
     try {
         console.log('Loading students list for teacher...');
         const response = await API.get('/api/chat/students');
-        studentsList = response;
-        displayContactsList(studentsList, 'student');
+        console.log('Students loaded:', response);
+        displayContactsList(response, 'student');
     } catch (error) {
         console.error('Failed to load students:', error);
         document.getElementById('usersList').innerHTML = `
@@ -74,20 +72,17 @@ function displayContactsList(users, type) {
         return;
     }
     
-    const badgeClass = type === 'alumni' ? 'alumni-badge' : 'student-badge';
-    const badgeIcon = type === 'alumni' ? '<i class="fas fa-graduation-cap me-1"></i>Alumni' : '<i class="fas fa-user-graduate me-1"></i>Student';
-    
     usersListDiv.innerHTML = users.map(user => `
-        <div class="chat-user-item" onclick="selectContact(${user.id}, '${escapeHtml(user.full_name)}', '${type}')">
+        <div class="chat-user-item" onclick='selectContact(${JSON.stringify(user)}, "${type}")'>
             <div class="d-flex align-items-center">
                 <div class="user-avatar me-3">
-                    ${user.full_name.charAt(0)}
+                    ${escapeHtml(user.full_name.charAt(0))}
                 </div>
                 <div class="flex-grow-1">
                     <div class="d-flex justify-content-between align-items-center">
                         <h6 class="mb-0">${escapeHtml(user.full_name)}</h6>
-                        <span class="${badgeClass}">
-                            ${badgeIcon}
+                        <span class="${type === 'alumni' ? 'alumni-badge' : 'student-badge'}">
+                            ${type === 'alumni' ? '<i class="fas fa-graduation-cap me-1"></i>Alumni' : '<i class="fas fa-user-graduate me-1"></i>Student'}
                         </span>
                     </div>
                     <small class="text-muted">@${escapeHtml(user.username)}</small>
@@ -98,22 +93,22 @@ function displayContactsList(users, type) {
     `).join('');
 }
 
-async function selectContact(userId, userName, userType) {
-    currentChatUser = { id: userId, name: userName, role: userType };
+async function selectContact(user, userType) {
+    currentChatUser = { id: user.id, name: user.full_name, role: userType };
     
     // Update chat header
-    document.getElementById('chatUserName').textContent = userName;
+    document.getElementById('chatUserName').textContent = user.full_name;
     const roleText = userType === 'alumni' ? 'Alumni Mentor' : 'Student';
     const roleIcon = userType === 'alumni' ? '<i class="fas fa-graduation-cap me-1"></i>' : '<i class="fas fa-user-graduate me-1"></i>';
     document.getElementById('chatUserRole').innerHTML = roleIcon + roleText;
-    document.getElementById('chatAvatar').textContent = userName.charAt(0);
+    document.getElementById('chatAvatar').textContent = user.full_name.charAt(0);
     
     // Enable input
     document.getElementById('messageInput').disabled = false;
     document.getElementById('sendBtn').disabled = false;
     
     // Load messages
-    await loadMessages(userId);
+    await loadMessages(user.id);
     
     // Connect WebSocket
     connectWebSocket();
@@ -173,8 +168,6 @@ function displayMessages(messages) {
         return;
     }
     
-    const currentUserId = getCurrentUserId();
-    
     messagesContainer.innerHTML = messages.map(msg => {
         const isSent = msg.sender_id === currentUserId;
         return `
@@ -200,6 +193,11 @@ function connectWebSocket() {
     }
     
     const token = Auth.getToken();
+    if (!token) {
+        console.error('No token available');
+        return;
+    }
+    
     ws = new WebSocket(`ws://127.0.0.1:8000/api/chat/ws/${token}`);
     
     ws.onopen = function() {
@@ -208,6 +206,7 @@ function connectWebSocket() {
     
     ws.onmessage = function(event) {
         const data = JSON.parse(event.data);
+        console.log('WebSocket message received:', data);
         
         if (data.type === 'message' || data.type === 'new_message') {
             // If message is from current chat user, display it
@@ -217,10 +216,8 @@ function connectWebSocket() {
             // Update unread count
             loadUnreadCount();
             // Play notification sound for new messages
-            if (data.sender_id !== getCurrentUserId()) {
+            if (data.sender_id !== currentUserId) {
                 playNotificationSound();
-                // Show browser notification if supported
-                showBrowserNotification(data.sender_name, data.message);
             }
         }
     };
@@ -237,7 +234,6 @@ function connectWebSocket() {
 
 function appendMessage(messageData) {
     const messagesContainer = document.getElementById('messagesContainer');
-    const currentUserId = getCurrentUserId();
     const isSent = messageData.sender_id === currentUserId;
     
     // Remove empty state if present
@@ -274,7 +270,7 @@ async function sendMessage() {
         
         // Append message to chat
         appendMessage({
-            sender_id: getCurrentUserId(),
+            sender_id: currentUserId,
             message: message,
             created_at: new Date().toISOString()
         });
@@ -294,9 +290,17 @@ async function sendMessage() {
     }
 }
 
-function getCurrentUserId() {
-    const userInfo = JSON.parse(localStorage.getItem('user_info') || '{}');
-    return userInfo.id || 1;
+async function getCurrentUserIdFromAPI() {
+    try {
+        const userInfo = await API.get('/auth/me');
+        currentUserId = userInfo.id;
+        localStorage.setItem('user_id', currentUserId);
+        console.log('Current user ID:', currentUserId);
+        return currentUserId;
+    } catch (error) {
+        console.error('Failed to get user ID:', error);
+        return null;
+    }
 }
 
 async function loadUnreadCount() {
@@ -304,11 +308,13 @@ async function loadUnreadCount() {
         const response = await API.get('/api/chat/unread-count');
         const unreadCount = response.unread_count;
         const badge = document.getElementById('unreadBadge');
-        if (unreadCount > 0) {
-            badge.style.display = 'inline-block';
-            badge.textContent = unreadCount > 99 ? '99+' : unreadCount;
-        } else {
-            badge.style.display = 'none';
+        if (badge) {
+            if (unreadCount > 0) {
+                badge.style.display = 'inline-block';
+                badge.textContent = unreadCount > 99 ? '99+' : unreadCount;
+            } else {
+                badge.style.display = 'none';
+            }
         }
     } catch (error) {
         console.error('Failed to load unread count:', error);
@@ -325,21 +331,6 @@ function playNotificationSound() {
     }
 }
 
-function showBrowserNotification(senderName, message) {
-    if (!("Notification" in window)) {
-        return;
-    }
-    
-    if (Notification.permission === "granted") {
-        new Notification(`New message from ${senderName}`, {
-            body: message.length > 50 ? message.substring(0, 50) + '...' : message,
-            icon: "/favicon.ico"
-        });
-    } else if (Notification.permission !== "denied") {
-        Notification.requestPermission();
-    }
-}
-
 function escapeHtml(text) {
     if (!text) return '';
     const div = document.createElement('div');
@@ -348,7 +339,7 @@ function escapeHtml(text) {
 }
 
 // Event Listeners
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', async function() {
     const logoutBtn = document.getElementById('logoutBtn');
     if (logoutBtn) {
         logoutBtn.addEventListener('click', function(e) {
@@ -357,6 +348,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
+    // Check if we're on chat page
     if (window.location.pathname.includes('chat.html')) {
         redirectIfNotLoggedIn();
         
@@ -369,13 +361,15 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
         
-        // Request notification permission
-        if ("Notification" in window && Notification.permission === "default") {
-            Notification.requestPermission();
-        }
+        // Get current user ID
+        await getCurrentUserIdFromAPI();
+        
+        // Set up tab buttons
+        document.getElementById('tabAlumni').addEventListener('click', () => switchTab('alumni'));
+        document.getElementById('tabStudents').addEventListener('click', () => switchTab('students'));
         
         // Load initial tab
-        switchTab('alumni');
+        await switchTab('alumni');
         
         const sendBtn = document.getElementById('sendBtn');
         const messageInput = document.getElementById('messageInput');
@@ -392,6 +386,7 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         }
         
+        // Load unread count periodically
         setInterval(loadUnreadCount, 30000);
         loadUnreadCount();
     }

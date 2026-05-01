@@ -84,11 +84,11 @@
             font-size: 11px;
             margin-left: 8px;
         }
-        .unread-indicator {
-            background: #dc3545;
+        .student-badge {
+            background: #17a2b8;
             color: white;
-            border-radius: 50%;
-            padding: 2px 6px;
+            border-radius: 12px;
+            padding: 2px 8px;
             font-size: 11px;
             margin-left: 8px;
         }
@@ -188,12 +188,8 @@
                         <!-- Chat sidebar -->
                         <div class="col-md-4 chat-sidebar">
                             <div class="tab-buttons">
-                                <button class="tab-btn active" id="tabAlumni" onclick="switchTab('alumni')">
-                                    <i class="fas fa-user-graduate me-2"></i>Alumni
-                                </button>
-                                <button class="tab-btn" id="tabStudents" onclick="switchTab('students')">
-                                    <i class="fas fa-users me-2"></i>Students
-                                </button>
+                                <button class="tab-btn active" id="tabAlumni">Alumni</button>
+                                <button class="tab-btn" id="tabStudents">Students</button>
                             </div>
                             <div id="usersList">
                                 <div class="text-center py-4">
@@ -225,9 +221,6 @@
                             </div>
                             
                             <div class="message-input-area">
-                                <div class="typing-indicator" id="typingIndicator" style="display: none;">
-                                    <i class="fas fa-ellipsis-h me-1"></i>Typing...
-                                </div>
                                 <div class="input-group">
                                     <input type="text" class="form-control" id="messageInput" placeholder="Type your message..." disabled>
                                     <button class="btn btn-primary" id="sendBtn" disabled>

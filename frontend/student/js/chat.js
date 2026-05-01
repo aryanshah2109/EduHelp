@@ -1,14 +1,14 @@
 // Student Chat Functions
 let currentChatUser = null;
 let ws = null;
-let alumniList = [];
+let currentUserId = null;
 
 async function loadAlumniForStudent() {
     try {
         console.log('Loading alumni list for student...');
         const response = await API.get('/api/chat/alumni');
-        alumniList = response;
-        displayAlumniList(alumniList);
+        console.log('Alumni loaded:', response);
+        displayAlumniList(response);
     } catch (error) {
         console.error('Failed to load alumni:', error);
         document.getElementById('usersList').innerHTML = `
@@ -38,10 +38,10 @@ function displayAlumniList(alumni) {
     }
     
     usersListDiv.innerHTML = alumni.map(alumnus => `
-        <div class="chat-user-item" onclick="selectAlumni(${alumnus.id}, '${escapeHtml(alumnus.full_name)}', '${alumnus.role}')">
+        <div class="chat-user-item" onclick='selectAlumni(${JSON.stringify(alumnus)})'>
             <div class="d-flex align-items-center">
                 <div class="user-avatar me-3">
-                    ${alumnus.full_name.charAt(0)}
+                    ${escapeHtml(alumnus.full_name.charAt(0))}
                 </div>
                 <div class="flex-grow-1">
                     <div class="d-flex justify-content-between align-items-center">
@@ -60,20 +60,20 @@ function displayAlumniList(alumni) {
     `).join('');
 }
 
-async function selectAlumni(userId, userName, userRole) {
-    currentChatUser = { id: userId, name: userName, role: 'alumni' };
+async function selectAlumni(alumnus) {
+    currentChatUser = { id: alumnus.id, name: alumnus.full_name, role: 'alumni' };
     
     // Update chat header
-    document.getElementById('chatUserName').textContent = userName;
+    document.getElementById('chatUserName').textContent = alumnus.full_name;
     document.getElementById('chatUserRole').innerHTML = '<i class="fas fa-graduation-cap me-1"></i>Alumni Mentor';
-    document.getElementById('chatAvatar').textContent = userName.charAt(0);
+    document.getElementById('chatAvatar').textContent = alumnus.full_name.charAt(0);
     
     // Enable input
     document.getElementById('messageInput').disabled = false;
     document.getElementById('sendBtn').disabled = false;
     
     // Load messages
-    await loadMessages(userId);
+    await loadMessages(alumnus.id);
     
     // Connect WebSocket
     connectWebSocket();
@@ -82,7 +82,9 @@ async function selectAlumni(userId, userName, userRole) {
     document.querySelectorAll('.chat-user-item').forEach(el => {
         el.classList.remove('active');
     });
-    event.currentTarget.classList.add('active');
+    if (event && event.currentTarget) {
+        event.currentTarget.classList.add('active');
+    }
 }
 
 async function loadMessages(otherUserId) {
@@ -127,8 +129,6 @@ function displayMessages(messages) {
         return;
     }
     
-    const currentUserId = getCurrentUserId();
-    
     messagesContainer.innerHTML = messages.map(msg => {
         const isSent = msg.sender_id === currentUserId;
         return `
@@ -154,6 +154,11 @@ function connectWebSocket() {
     }
     
     const token = Auth.getToken();
+    if (!token) {
+        console.error('No token available');
+        return;
+    }
+    
     ws = new WebSocket(`ws://127.0.0.1:8000/api/chat/ws/${token}`);
     
     ws.onopen = function() {
@@ -162,6 +167,7 @@ function connectWebSocket() {
     
     ws.onmessage = function(event) {
         const data = JSON.parse(event.data);
+        console.log('WebSocket message received:', data);
         
         if (data.type === 'message' || data.type === 'new_message') {
             // If message is from current chat user, display it
@@ -170,10 +176,6 @@ function connectWebSocket() {
             }
             // Update unread count
             loadUnreadCount();
-            // Play notification sound (optional)
-            if (data.sender_id !== getCurrentUserId()) {
-                playNotificationSound();
-            }
         }
     };
     
@@ -190,7 +192,6 @@ function connectWebSocket() {
 
 function appendMessage(messageData) {
     const messagesContainer = document.getElementById('messagesContainer');
-    const currentUserId = getCurrentUserId();
     const isSent = messageData.sender_id === currentUserId;
     
     // Remove empty state if present
@@ -220,14 +221,14 @@ async function sendMessage() {
     if (!message || !currentChatUser) return;
     
     try {
-        const response = await API.post(`/api/chat/send?receiver_id=${currentChatUser.id}&message=${encodeURIComponent(message)}`, {});
+        await API.post(`/api/chat/send?receiver_id=${currentChatUser.id}&message=${encodeURIComponent(message)}`, {});
         
         // Clear input
         messageInput.value = '';
         
         // Append message to chat
         appendMessage({
-            sender_id: getCurrentUserId(),
+            sender_id: currentUserId,
             message: message,
             created_at: new Date().toISOString()
         });
@@ -247,10 +248,17 @@ async function sendMessage() {
     }
 }
 
-function getCurrentUserId() {
-    // Get user info from stored token or API
-    const userInfo = JSON.parse(localStorage.getItem('user_info') || '{}');
-    return userInfo.id || 1;
+async function getCurrentUserIdFromAPI() {
+    try {
+        const userInfo = await API.get('/auth/me');
+        currentUserId = userInfo.id;
+        localStorage.setItem('user_id', currentUserId);
+        console.log('Current user ID:', currentUserId);
+        return currentUserId;
+    } catch (error) {
+        console.error('Failed to get user ID:', error);
+        return null;
+    }
 }
 
 async function loadUnreadCount() {
@@ -258,25 +266,16 @@ async function loadUnreadCount() {
         const response = await API.get('/api/chat/unread-count');
         const unreadCount = response.unread_count;
         const badge = document.getElementById('unreadBadge');
-        if (unreadCount > 0) {
-            badge.style.display = 'inline-block';
-            badge.textContent = unreadCount > 99 ? '99+' : unreadCount;
-        } else {
-            badge.style.display = 'none';
+        if (badge) {
+            if (unreadCount > 0) {
+                badge.style.display = 'inline-block';
+                badge.textContent = unreadCount > 99 ? '99+' : unreadCount;
+            } else {
+                badge.style.display = 'none';
+            }
         }
     } catch (error) {
         console.error('Failed to load unread count:', error);
-    }
-}
-
-function playNotificationSound() {
-    // Optional: Play a subtle notification sound
-    try {
-        const audio = new Audio('https://www.soundjay.com/misc/sounds/bell-ringing-05.mp3');
-        audio.volume = 0.3;
-        audio.play().catch(e => console.log('Audio play failed:', e));
-    } catch (error) {
-        console.log('Notification sound not available');
     }
 }
 
@@ -288,7 +287,7 @@ function escapeHtml(text) {
 }
 
 // Event Listeners
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', async function() {
     const logoutBtn = document.getElementById('logoutBtn');
     if (logoutBtn) {
         logoutBtn.addEventListener('click', function(e) {
@@ -310,7 +309,11 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
         
-        loadAlumniForStudent();
+        // Get current user ID
+        await getCurrentUserIdFromAPI();
+        
+        // Load alumni list
+        await loadAlumniForStudent();
         
         const sendBtn = document.getElementById('sendBtn');
         const messageInput = document.getElementById('messageInput');
