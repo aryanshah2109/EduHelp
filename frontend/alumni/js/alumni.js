@@ -1,4 +1,10 @@
-// Alumni Dashboard Functions
+let currentChatUser = null;
+let ws = null;
+let currentTab = 'students';
+let currentUserId = null;
+let studentsList = [];
+let teachersList = [];
+
 async function loadAlumniDashboard() {
     try {
         const dashboardData = await API.get('/api/alumni/dashboard');
@@ -11,13 +17,11 @@ async function loadAlumniDashboard() {
 }
 
 function displayAlumniDashboard(data) {
-    // Update welcome name
     const alumniName = document.getElementById('alumniName');
     if (alumniName && data.alumni && data.alumni.user) {
         alumniName.textContent = data.alumni.user.full_name;
     }
     
-    // Update stats
     const unreadCount = document.getElementById('unreadCount');
     if (unreadCount) {
         unreadCount.textContent = data.unread_messages || 0;
@@ -28,7 +32,6 @@ function displayAlumniDashboard(data) {
         connectionsCount.textContent = data.connections_count || 0;
     }
     
-    // Display recent conversations
     const recentConversations = document.getElementById('recentConversations');
     if (recentConversations) {
         if (!data.recent_conversations || data.recent_conversations.length === 0) {
@@ -58,53 +61,88 @@ function displayAlumniDashboard(data) {
     }
 }
 
-// Chat Functions
-let currentChatUser = null;
-let ws = null;
-let currentTab = 'students';
-let studentsList = [];
-let teachersList = [];
-
-async function loadUsers() {
-    try {
-        if (currentTab === 'students') {
-            const response = await API.get('/api/alumni/students');
-            studentsList = response;
-            displayUsersList(studentsList);
-        } else {
-            const response = await API.get('/api/alumni/teachers');
-            teachersList = response;
-            displayUsersList(teachersList);
-        }
-    } catch (error) {
-        console.error('Failed to load users:', error);
-        showNotification('Failed to load users: ' + error.message, 'danger');
+async function switchTab(tab) {
+    currentTab = tab;
+    
+    document.getElementById('tabStudents').classList.remove('active');
+    document.getElementById('tabTeachers').classList.remove('active');
+    if (tab === 'students') {
+        document.getElementById('tabStudents').classList.add('active');
+        await loadStudentsForAlumni();
+    } else {
+        document.getElementById('tabTeachers').classList.add('active');
+        await loadTeachersForAlumni();
     }
 }
 
-function displayUsersList(users) {
+async function loadStudentsForAlumni() {
+    try {
+        console.log('Loading students list for alumni...');
+        const response = await API.get('/api/alumni/students');
+        studentsList = response;
+        displayContactsList(studentsList, 'student');
+    } catch (error) {
+        console.error('Failed to load students:', error);
+        document.getElementById('usersList').innerHTML = `
+            <div class="text-center text-muted py-4">
+                <i class="fas fa-exclamation-triangle fa-3x mb-3 d-block"></i>
+                <p>Failed to load students: ${error.message}</p>
+                <button class="btn btn-primary btn-sm" onclick="loadStudentsForAlumni()">
+                    <i class="fas fa-redo me-1"></i>Retry
+                </button>
+            </div>
+        `;
+    }
+}
+
+async function loadTeachersForAlumni() {
+    try {
+        console.log('Loading teachers list for alumni...');
+        const response = await API.get('/api/alumni/teachers');
+        teachersList = response;
+        displayContactsList(teachersList, 'teacher');
+    } catch (error) {
+        console.error('Failed to load teachers:', error);
+        document.getElementById('usersList').innerHTML = `
+            <div class="text-center text-muted py-4">
+                <i class="fas fa-exclamation-triangle fa-3x mb-3 d-block"></i>
+                <p>Failed to load teachers: ${error.message}</p>
+                <button class="btn btn-primary btn-sm" onclick="loadTeachersForAlumni()">
+                    <i class="fas fa-redo me-1"></i>Retry
+                </button>
+            </div>
+        `;
+    }
+}
+
+function displayContactsList(users, type) {
     const usersListDiv = document.getElementById('usersList');
     
     if (!users || users.length === 0) {
         usersListDiv.innerHTML = `
             <div class="text-center text-muted py-4">
                 <i class="fas fa-users fa-3x mb-3 d-block"></i>
-                <p>No ${currentTab} found</p>
+                <p>No ${type}s found</p>
             </div>
         `;
         return;
     }
     
+    const badgeClass = type === 'student' ? 'student-badge' : 'teacher-badge';
+    const badgeIcon = type === 'student' ? '<i class="fas fa-user-graduate me-1"></i>Student' : '<i class="fas fa-chalkboard-teacher me-1"></i>Teacher';
+    
     usersListDiv.innerHTML = users.map(user => `
-        <div class="chat-user-item" onclick="selectUser(${user.id}, '${escapeHtml(user.full_name)}', '${user.role}')">
+        <div class="chat-user-item" onclick='selectContact(${JSON.stringify(user)}, "${type}")'>
             <div class="d-flex align-items-center">
                 <div class="user-avatar me-3">
-                    ${user.full_name.charAt(0)}
+                    ${escapeHtml(user.full_name.charAt(0))}
                 </div>
                 <div class="flex-grow-1">
                     <div class="d-flex justify-content-between align-items-center">
                         <h6 class="mb-0">${escapeHtml(user.full_name)}</h6>
-                        <small class="text-muted" id="lastSeen_${user.id}"></small>
+                        <span class="${badgeClass}">
+                            ${badgeIcon}
+                        </span>
                     </div>
                     <small class="text-muted">@${escapeHtml(user.username)}</small>
                 </div>
@@ -113,23 +151,27 @@ function displayUsersList(users) {
     `).join('');
 }
 
-async function selectUser(userId, userName, userRole) {
-    currentChatUser = { id: userId, name: userName, role: userRole };
+async function selectContact(user, userType) {
+    currentChatUser = { id: user.id, name: user.full_name, role: userType };
     
-    // Update chat header
-    document.getElementById('chatUserName').textContent = userName;
-    document.getElementById('chatUserRole').textContent = userRole.charAt(0).toUpperCase() + userRole.slice(1);
-    document.getElementById('chatAvatar').textContent = userName.charAt(0);
+    document.getElementById('chatUserName').textContent = user.full_name;
+    const roleText = userType === 'student' ? 'Student' : 'Teacher';
+    const roleIcon = userType === 'student' ? '<i class="fas fa-user-graduate me-1"></i>' : '<i class="fas fa-chalkboard-teacher me-1"></i>';
+    document.getElementById('chatUserRole').innerHTML = roleIcon + roleText;
+    document.getElementById('chatAvatar').textContent = user.full_name.charAt(0);
     
-    // Enable input
     document.getElementById('messageInput').disabled = false;
     document.getElementById('sendBtn').disabled = false;
     
-    // Load messages
-    await loadMessages(userId);
-    
-    // Connect WebSocket
+    await loadMessages(user.id);
     connectWebSocket();
+    
+    document.querySelectorAll('.chat-user-item').forEach(el => {
+        el.classList.remove('active');
+    });
+    if (event && event.currentTarget) {
+        event.currentTarget.classList.add('active');
+    }
 }
 
 async function loadMessages(otherUserId) {
@@ -152,6 +194,9 @@ async function loadMessages(otherUserId) {
             <div class="text-center text-muted py-5">
                 <i class="fas fa-exclamation-triangle fa-3x mb-3 d-block"></i>
                 <p>Failed to load messages: ${error.message}</p>
+                <button class="btn btn-primary btn-sm" onclick="loadMessages(${otherUserId})">
+                    <i class="fas fa-redo me-1"></i>Retry
+                </button>
             </div>
         `;
     }
@@ -170,8 +215,6 @@ function displayMessages(messages) {
         return;
     }
     
-    const currentUserId = getCurrentUserId();
-    
     messagesContainer.innerHTML = messages.map(msg => {
         const isSent = msg.sender_id === currentUserId;
         return `
@@ -187,7 +230,6 @@ function displayMessages(messages) {
         `;
     }).join('');
     
-    // Scroll to bottom
     messagesContainer.scrollTop = messagesContainer.scrollHeight;
 }
 
@@ -197,6 +239,11 @@ function connectWebSocket() {
     }
     
     const token = Auth.getToken();
+    if (!token) {
+        console.error('No token available');
+        return;
+    }
+    
     ws = new WebSocket(`ws://127.0.0.1:8000/api/chat/ws/${token}`);
     
     ws.onopen = function() {
@@ -205,13 +252,12 @@ function connectWebSocket() {
     
     ws.onmessage = function(event) {
         const data = JSON.parse(event.data);
+        console.log('WebSocket message received:', data);
         
         if (data.type === 'message' || data.type === 'new_message') {
-            // If message is from current chat user, display it
             if (data.sender_id === currentChatUser?.id) {
                 appendMessage(data);
             }
-            // Update unread count
             loadUnreadCount();
         }
     };
@@ -222,17 +268,14 @@ function connectWebSocket() {
     
     ws.onclose = function() {
         console.log('WebSocket disconnected');
-        // Attempt to reconnect after 5 seconds
         setTimeout(connectWebSocket, 5000);
     };
 }
 
 function appendMessage(messageData) {
     const messagesContainer = document.getElementById('messagesContainer');
-    const currentUserId = getCurrentUserId();
     const isSent = messageData.sender_id === currentUserId;
     
-    // Remove empty state if present
     if (messagesContainer.querySelector('.text-center.text-muted')) {
         messagesContainer.innerHTML = '';
     }
@@ -259,19 +302,16 @@ async function sendMessage() {
     if (!message || !currentChatUser) return;
     
     try {
-        const response = await API.post(`/api/chat/send?receiver_id=${currentChatUser.id}&message=${encodeURIComponent(message)}`, {});
+        await API.post(`/api/chat/send?receiver_id=${currentChatUser.id}&message=${encodeURIComponent(message)}`, {});
         
-        // Clear input
         messageInput.value = '';
         
-        // Append message to chat
         appendMessage({
-            sender_id: getCurrentUserId(),
+            sender_id: currentUserId,
             message: message,
             created_at: new Date().toISOString()
         });
         
-        // Send via WebSocket for real-time
         if (ws && ws.readyState === WebSocket.OPEN) {
             ws.send(JSON.stringify({
                 type: 'message',
@@ -286,11 +326,17 @@ async function sendMessage() {
     }
 }
 
-function getCurrentUserId() {
-    const token = Auth.getToken();
-    // Decode JWT to get user ID (simplified - in production, use proper JWT decoding)
-    const payload = JSON.parse(atob(token.split('.')[1]));
-    return payload.sub ? 1 : 1; // Fallback for demo
+async function getCurrentUserIdFromAPI() {
+    try {
+        const userInfo = await API.get('/auth/me');
+        currentUserId = userInfo.id;
+        localStorage.setItem('user_id', currentUserId);
+        console.log('Current user ID:', currentUserId);
+        return currentUserId;
+    } catch (error) {
+        console.error('Failed to get user ID:', error);
+        return null;
+    }
 }
 
 async function loadUnreadCount() {
@@ -298,20 +344,18 @@ async function loadUnreadCount() {
         const response = await API.get('/api/chat/unread-count');
         const unreadCount = response.unread_count;
         const badge = document.getElementById('unreadBadge');
-        if (unreadCount > 0) {
-            badge.style.display = 'inline-block';
-            badge.textContent = unreadCount > 99 ? '99+' : unreadCount;
-        } else {
-            badge.style.display = 'none';
+        if (badge) {
+            if (unreadCount > 0) {
+                badge.style.display = 'inline-block';
+                badge.textContent = unreadCount > 99 ? '99+' : unreadCount;
+            } else {
+                badge.style.display = 'none';
+            }
         }
     } catch (error) {
         console.error('Failed to load unread count:', error);
     }
 }
-
-// Profile Functions
-let isEditing = false;
-let originalProfileData = null;
 
 async function loadAlumniProfile() {
     try {
@@ -324,7 +368,6 @@ async function loadAlumniProfile() {
 }
 
 function displayAlumniProfile(alumni) {
-    // Update basic info
     const profileName = document.getElementById('profileName');
     if (profileName) {
         profileName.textContent = alumni.user.full_name;
@@ -335,7 +378,6 @@ function displayAlumniProfile(alumni) {
         profileEmail.textContent = alumni.user.email;
     }
     
-    // Display professional info
     const profileInfo = document.getElementById('profileInfo');
     profileInfo.innerHTML = `
         <div class="row">
@@ -367,7 +409,6 @@ function displayAlumniProfile(alumni) {
         </div>
     `;
     
-    // Display bio
     const bioSection = document.getElementById('bioSection');
     bioSection.innerHTML = `
         <div>
@@ -376,9 +417,11 @@ function displayAlumniProfile(alumni) {
         </div>
     `;
     
-    // Store original data for cancel
     originalProfileData = alumni;
 }
+
+let isEditing = false;
+let originalProfileData = null;
 
 function toggleEditMode() {
     isEditing = !isEditing;
@@ -418,7 +461,7 @@ async function saveProfile() {
         const response = await API.put('/api/alumni/profile', updatedData);
         showNotification('Profile updated successfully!', 'success');
         toggleEditMode();
-        loadAlumniProfile(); // Reload profile
+        loadAlumniProfile();
     } catch (error) {
         console.error('Failed to update profile:', error);
         showNotification('Failed to update profile: ' + error.message, 'danger');
@@ -427,7 +470,7 @@ async function saveProfile() {
 
 function cancelEdit() {
     toggleEditMode();
-    loadAlumniProfile(); // Reload original data
+    loadAlumniProfile();
 }
 
 function formatRelativeTime(dateString) {
@@ -452,8 +495,7 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
-// Event Listeners for Chat page
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', async function() {
     const logoutBtn = document.getElementById('logoutBtn');
     if (logoutBtn) {
         logoutBtn.addEventListener('click', function(e) {
@@ -462,40 +504,24 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    // Handle chat page specific initialization
     if (window.location.pathname.includes('chat.html')) {
         const urlParams = new URLSearchParams(window.location.search);
         const tab = urlParams.get('tab');
-        if (tab === 'students') {
-            currentTab = 'students';
-            document.getElementById('tabStudents').classList.add('active');
-            document.getElementById('tabTeachers').classList.remove('active');
-        } else if (tab === 'teachers') {
-            currentTab = 'teachers';
-            document.getElementById('tabTeachers').classList.add('active');
-            document.getElementById('tabStudents').classList.remove('active');
+        
+        await getCurrentUserIdFromAPI();
+        
+        document.getElementById('tabStudents').addEventListener('click', () => switchTab('students'));
+        document.getElementById('tabTeachers').addEventListener('click', () => switchTab('teachers'));
+        
+        if (tab === 'teachers') {
+            await switchTab('teachers');
+        } else {
+            await switchTab('students');
         }
-        
-        document.getElementById('tabStudents').addEventListener('click', () => {
-            currentTab = 'students';
-            document.getElementById('tabStudents').classList.add('active');
-            document.getElementById('tabTeachers').classList.remove('active');
-            loadUsers();
-        });
-        
-        document.getElementById('tabTeachers').addEventListener('click', () => {
-            currentTab = 'teachers';
-            document.getElementById('tabTeachers').classList.add('active');
-            document.getElementById('tabStudents').classList.remove('active');
-            loadUsers();
-        });
-        
-        loadUsers();
         
         const selectedUser = urlParams.get('user');
         if (selectedUser) {
             setTimeout(() => {
-                // Find user in list and select
                 const userElement = document.querySelector(`.chat-user-item[onclick*="${selectedUser}"]`);
                 if (userElement) {
                     userElement.click();
@@ -518,13 +544,15 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         }
         
-        // Load unread count periodically
         setInterval(loadUnreadCount, 30000);
         loadUnreadCount();
     }
     
-    // Handle profile page
     if (window.location.pathname.includes('profile.html')) {
         loadAlumniProfile();
+    }
+    
+    if (window.location.pathname.includes('dashboard.html')) {
+        loadAlumniDashboard();
     }
 });

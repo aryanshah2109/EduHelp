@@ -1,14 +1,28 @@
-// Student Chat Functions
 let currentChatUser = null;
 let ws = null;
 let currentUserId = null;
+let currentTab = 'alumni';
+
+async function switchTab(tab) {
+    currentTab = tab;
+    
+    document.getElementById('tabAlumni').classList.remove('active');
+    document.getElementById('tabTeachers').classList.remove('active');
+    if (tab === 'alumni') {
+        document.getElementById('tabAlumni').classList.add('active');
+        await loadAlumniForStudent();
+    } else {
+        document.getElementById('tabTeachers').classList.add('active');
+        await loadTeachersForStudent();
+    }
+}
 
 async function loadAlumniForStudent() {
     try {
         console.log('Loading alumni list for student...');
         const response = await API.get('/api/chat/alumni');
         console.log('Alumni loaded:', response);
-        displayAlumniList(response);
+        displayContactsList(response, 'alumni');
     } catch (error) {
         console.error('Failed to load alumni:', error);
         document.getElementById('usersList').innerHTML = `
@@ -23,62 +37,79 @@ async function loadAlumniForStudent() {
     }
 }
 
-function displayAlumniList(alumni) {
+async function loadTeachersForStudent() {
+    try {
+        console.log('Loading teachers list for student...');
+        const response = await API.get('/api/chat/teachers');
+        console.log('Teachers loaded:', response);
+        displayContactsList(response, 'teacher');
+    } catch (error) {
+        console.error('Failed to load teachers:', error);
+        document.getElementById('usersList').innerHTML = `
+            <div class="text-center text-muted py-4">
+                <i class="fas fa-exclamation-triangle fa-3x mb-3 d-block"></i>
+                <p>Failed to load teachers: ${error.message}</p>
+                <button class="btn btn-primary btn-sm" onclick="loadTeachersForStudent()">
+                    <i class="fas fa-redo me-1"></i>Retry
+                </button>
+            </div>
+        `;
+    }
+}
+
+function displayContactsList(users, type) {
     const usersListDiv = document.getElementById('usersList');
     
-    if (!alumni || alumni.length === 0) {
+    if (!users || users.length === 0) {
         usersListDiv.innerHTML = `
             <div class="text-center text-muted py-4">
-                <i class="fas fa-user-graduate fa-3x mb-3 d-block"></i>
-                <p>No alumni available at the moment.</p>
-                <small>Check back later for mentorship opportunities!</small>
+                <i class="fas fa-users fa-3x mb-3 d-block"></i>
+                <p>No ${type}s available at the moment.</p>
             </div>
         `;
         return;
     }
     
-    usersListDiv.innerHTML = alumni.map(alumnus => `
-        <div class="chat-user-item" onclick='selectAlumni(${JSON.stringify(alumnus)})'>
+    const badgeClass = type === 'alumni' ? 'alumni-badge' : 'teacher-badge';
+    const badgeIcon = type === 'alumni' ? '<i class="fas fa-graduation-cap me-1"></i>Alumni' : '<i class="fas fa-chalkboard-teacher me-1"></i>Teacher';
+    const extraInfo = type === 'alumni' ? '<div class="small text-success"><i class="fas fa-briefcase me-1"></i>Available for mentorship</div>' : '';
+    
+    usersListDiv.innerHTML = users.map(user => `
+        <div class="chat-user-item" onclick='selectContact(${JSON.stringify(user)}, "${type}")'>
             <div class="d-flex align-items-center">
                 <div class="user-avatar me-3">
-                    ${escapeHtml(alumnus.full_name.charAt(0))}
+                    ${escapeHtml(user.full_name.charAt(0))}
                 </div>
                 <div class="flex-grow-1">
                     <div class="d-flex justify-content-between align-items-center">
-                        <h6 class="mb-0">${escapeHtml(alumnus.full_name)}</h6>
-                        <span class="alumni-badge">
-                            <i class="fas fa-graduation-cap me-1"></i>Alumni
+                        <h6 class="mb-0">${escapeHtml(user.full_name)}</h6>
+                        <span class="${badgeClass}">
+                            ${badgeIcon}
                         </span>
                     </div>
-                    <small class="text-muted">@${escapeHtml(alumnus.username)}</small>
-                    <div class="small text-success">
-                        <i class="fas fa-briefcase me-1"></i>Available for mentorship
-                    </div>
+                    <small class="text-muted">@${escapeHtml(user.username)}</small>
+                    ${extraInfo}
                 </div>
             </div>
         </div>
     `).join('');
 }
 
-async function selectAlumni(alumnus) {
-    currentChatUser = { id: alumnus.id, name: alumnus.full_name, role: 'alumni' };
+async function selectContact(user, userType) {
+    currentChatUser = { id: user.id, name: user.full_name, role: userType };
     
-    // Update chat header
-    document.getElementById('chatUserName').textContent = alumnus.full_name;
-    document.getElementById('chatUserRole').innerHTML = '<i class="fas fa-graduation-cap me-1"></i>Alumni Mentor';
-    document.getElementById('chatAvatar').textContent = alumnus.full_name.charAt(0);
+    document.getElementById('chatUserName').textContent = user.full_name;
+    const roleText = userType === 'alumni' ? 'Alumni Mentor' : 'Teacher';
+    const roleIcon = userType === 'alumni' ? '<i class="fas fa-graduation-cap me-1"></i>' : '<i class="fas fa-chalkboard-teacher me-1"></i>';
+    document.getElementById('chatUserRole').innerHTML = roleIcon + roleText;
+    document.getElementById('chatAvatar').textContent = user.full_name.charAt(0);
     
-    // Enable input
     document.getElementById('messageInput').disabled = false;
     document.getElementById('sendBtn').disabled = false;
     
-    // Load messages
-    await loadMessages(alumnus.id);
-    
-    // Connect WebSocket
+    await loadMessages(user.id);
     connectWebSocket();
     
-    // Highlight selected user
     document.querySelectorAll('.chat-user-item').forEach(el => {
         el.classList.remove('active');
     });
@@ -119,11 +150,15 @@ function displayMessages(messages) {
     const messagesContainer = document.getElementById('messagesContainer');
     
     if (!messages || messages.length === 0) {
+        const welcomeMessage = currentChatUser.role === 'alumni' 
+            ? 'Start a conversation with this alumni. They can provide valuable industry insights and mentorship!'
+            : 'Start a conversation with your teacher for guidance and support.';
+        
         messagesContainer.innerHTML = `
             <div class="text-center text-muted py-5">
                 <i class="fas fa-comments fa-3x mb-3 d-block"></i>
                 <p>No messages yet. Start the conversation!</p>
-                <small>Ask about career advice, interview tips, or industry insights.</small>
+                <small>${welcomeMessage}</small>
             </div>
         `;
         return;
@@ -144,7 +179,6 @@ function displayMessages(messages) {
         `;
     }).join('');
     
-    // Scroll to bottom
     messagesContainer.scrollTop = messagesContainer.scrollHeight;
 }
 
@@ -170,11 +204,9 @@ function connectWebSocket() {
         console.log('WebSocket message received:', data);
         
         if (data.type === 'message' || data.type === 'new_message') {
-            // If message is from current chat user, display it
             if (data.sender_id === currentChatUser?.id) {
                 appendMessage(data);
             }
-            // Update unread count
             loadUnreadCount();
         }
     };
@@ -185,7 +217,6 @@ function connectWebSocket() {
     
     ws.onclose = function() {
         console.log('WebSocket disconnected');
-        // Attempt to reconnect after 5 seconds
         setTimeout(connectWebSocket, 5000);
     };
 }
@@ -194,7 +225,6 @@ function appendMessage(messageData) {
     const messagesContainer = document.getElementById('messagesContainer');
     const isSent = messageData.sender_id === currentUserId;
     
-    // Remove empty state if present
     if (messagesContainer.querySelector('.text-center.text-muted')) {
         messagesContainer.innerHTML = '';
     }
@@ -223,17 +253,14 @@ async function sendMessage() {
     try {
         await API.post(`/api/chat/send?receiver_id=${currentChatUser.id}&message=${encodeURIComponent(message)}`, {});
         
-        // Clear input
         messageInput.value = '';
         
-        // Append message to chat
         appendMessage({
             sender_id: currentUserId,
             message: message,
             created_at: new Date().toISOString()
         });
         
-        // Send via WebSocket for real-time
         if (ws && ws.readyState === WebSocket.OPEN) {
             ws.send(JSON.stringify({
                 type: 'message',
@@ -286,7 +313,6 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
-// Event Listeners
 document.addEventListener('DOMContentLoaded', async function() {
     const logoutBtn = document.getElementById('logoutBtn');
     if (logoutBtn) {
@@ -296,7 +322,6 @@ document.addEventListener('DOMContentLoaded', async function() {
         });
     }
     
-    // Check if we're on chat page
     if (window.location.pathname.includes('chat.html')) {
         redirectIfNotLoggedIn();
         
@@ -309,11 +334,12 @@ document.addEventListener('DOMContentLoaded', async function() {
             return;
         }
         
-        // Get current user ID
         await getCurrentUserIdFromAPI();
         
-        // Load alumni list
-        await loadAlumniForStudent();
+        document.getElementById('tabAlumni').addEventListener('click', () => switchTab('alumni'));
+        document.getElementById('tabTeachers').addEventListener('click', () => switchTab('teachers'));
+        
+        await switchTab('alumni');
         
         const sendBtn = document.getElementById('sendBtn');
         const messageInput = document.getElementById('messageInput');
@@ -330,7 +356,6 @@ document.addEventListener('DOMContentLoaded', async function() {
             });
         }
         
-        // Load unread count periodically
         setInterval(loadUnreadCount, 30000);
         loadUnreadCount();
     }

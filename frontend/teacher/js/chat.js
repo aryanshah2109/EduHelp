@@ -1,4 +1,3 @@
-// Teacher Chat Functions
 let currentChatUser = null;
 let ws = null;
 let currentTab = 'alumni';
@@ -7,7 +6,6 @@ let currentUserId = null;
 async function switchTab(tab) {
     currentTab = tab;
     
-    // Update tab buttons
     document.getElementById('tabAlumni').classList.remove('active');
     document.getElementById('tabStudents').classList.remove('active');
     if (tab === 'alumni') {
@@ -72,6 +70,9 @@ function displayContactsList(users, type) {
         return;
     }
     
+    const badgeClass = type === 'alumni' ? 'alumni-badge' : 'student-badge';
+    const badgeIcon = type === 'alumni' ? '<i class="fas fa-graduation-cap me-1"></i>Alumni' : '<i class="fas fa-user-graduate me-1"></i>Student';
+    
     usersListDiv.innerHTML = users.map(user => `
         <div class="chat-user-item" onclick='selectContact(${JSON.stringify(user)}, "${type}")'>
             <div class="d-flex align-items-center">
@@ -81,8 +82,8 @@ function displayContactsList(users, type) {
                 <div class="flex-grow-1">
                     <div class="d-flex justify-content-between align-items-center">
                         <h6 class="mb-0">${escapeHtml(user.full_name)}</h6>
-                        <span class="${type === 'alumni' ? 'alumni-badge' : 'student-badge'}">
-                            ${type === 'alumni' ? '<i class="fas fa-graduation-cap me-1"></i>Alumni' : '<i class="fas fa-user-graduate me-1"></i>Student'}
+                        <span class="${badgeClass}">
+                            ${badgeIcon}
                         </span>
                     </div>
                     <small class="text-muted">@${escapeHtml(user.username)}</small>
@@ -96,24 +97,18 @@ function displayContactsList(users, type) {
 async function selectContact(user, userType) {
     currentChatUser = { id: user.id, name: user.full_name, role: userType };
     
-    // Update chat header
     document.getElementById('chatUserName').textContent = user.full_name;
     const roleText = userType === 'alumni' ? 'Alumni Mentor' : 'Student';
     const roleIcon = userType === 'alumni' ? '<i class="fas fa-graduation-cap me-1"></i>' : '<i class="fas fa-user-graduate me-1"></i>';
     document.getElementById('chatUserRole').innerHTML = roleIcon + roleText;
     document.getElementById('chatAvatar').textContent = user.full_name.charAt(0);
     
-    // Enable input
     document.getElementById('messageInput').disabled = false;
     document.getElementById('sendBtn').disabled = false;
     
-    // Load messages
     await loadMessages(user.id);
-    
-    // Connect WebSocket
     connectWebSocket();
     
-    // Highlight selected user
     document.querySelectorAll('.chat-user-item').forEach(el => {
         el.classList.remove('active');
     });
@@ -183,7 +178,6 @@ function displayMessages(messages) {
         `;
     }).join('');
     
-    // Scroll to bottom
     messagesContainer.scrollTop = messagesContainer.scrollHeight;
 }
 
@@ -209,13 +203,10 @@ function connectWebSocket() {
         console.log('WebSocket message received:', data);
         
         if (data.type === 'message' || data.type === 'new_message') {
-            // If message is from current chat user, display it
             if (data.sender_id === currentChatUser?.id) {
                 appendMessage(data);
             }
-            // Update unread count
             loadUnreadCount();
-            // Play notification sound for new messages
             if (data.sender_id !== currentUserId) {
                 playNotificationSound();
             }
@@ -236,7 +227,6 @@ function appendMessage(messageData) {
     const messagesContainer = document.getElementById('messagesContainer');
     const isSent = messageData.sender_id === currentUserId;
     
-    // Remove empty state if present
     if (messagesContainer.querySelector('.text-center.text-muted')) {
         messagesContainer.innerHTML = '';
     }
@@ -265,17 +255,14 @@ async function sendMessage() {
     try {
         await API.post(`/api/chat/send?receiver_id=${currentChatUser.id}&message=${encodeURIComponent(message)}`, {});
         
-        // Clear input
         messageInput.value = '';
         
-        // Append message to chat
         appendMessage({
             sender_id: currentUserId,
             message: message,
             created_at: new Date().toISOString()
         });
         
-        // Send via WebSocket for real-time
         if (ws && ws.readyState === WebSocket.OPEN) {
             ws.send(JSON.stringify({
                 type: 'message',
@@ -338,7 +325,6 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
-// Event Listeners
 document.addEventListener('DOMContentLoaded', async function() {
     const logoutBtn = document.getElementById('logoutBtn');
     if (logoutBtn) {
@@ -348,7 +334,6 @@ document.addEventListener('DOMContentLoaded', async function() {
         });
     }
     
-    // Check if we're on chat page
     if (window.location.pathname.includes('chat.html')) {
         redirectIfNotLoggedIn();
         
@@ -361,14 +346,11 @@ document.addEventListener('DOMContentLoaded', async function() {
             return;
         }
         
-        // Get current user ID
         await getCurrentUserIdFromAPI();
         
-        // Set up tab buttons
         document.getElementById('tabAlumni').addEventListener('click', () => switchTab('alumni'));
         document.getElementById('tabStudents').addEventListener('click', () => switchTab('students'));
         
-        // Load initial tab
         await switchTab('alumni');
         
         const sendBtn = document.getElementById('sendBtn');
@@ -386,7 +368,6 @@ document.addEventListener('DOMContentLoaded', async function() {
             });
         }
         
-        // Load unread count periodically
         setInterval(loadUnreadCount, 30000);
         loadUnreadCount();
     }

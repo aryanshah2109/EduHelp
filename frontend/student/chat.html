@@ -23,6 +23,7 @@
         .message {
             margin-bottom: 15px;
             display: flex;
+            width: 100%;
         }
         .message.sent {
             justify-content: flex-end;
@@ -39,11 +40,13 @@
         .message.sent .message-bubble {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
+            border-bottom-right-radius: 5px;
         }
         .message.received .message-bubble {
             background: white;
             border: 1px solid #dee2e6;
             color: #2c3e50;
+            border-bottom-left-radius: 5px;
         }
         .message-time {
             font-size: 11px;
@@ -84,17 +87,42 @@
             font-size: 11px;
             margin-left: 8px;
         }
+        .teacher-badge {
+            background: #17a2b8;
+            color: white;
+            border-radius: 12px;
+            padding: 2px 8px;
+            font-size: 11px;
+            margin-left: 8px;
+        }
         .message-input-area {
             padding: 15px;
             background: white;
             border-top: 1px solid #dee2e6;
+        }
+        .btn-group-custom {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        .btn-custom {
+            flex: 1;
+            padding: 8px;
+            border: none;
+            background: #f8f9fa;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .btn-custom.active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
         }
     </style>
 </head>
 <body>
     <div class="container-fluid">
         <div class="row">
-            <!-- Sidebar -->
             <nav class="col-md-3 col-lg-2 d-md-block sidebar collapse">
                 <div class="position-sticky pt-3">
                     <div class="text-center mb-4">
@@ -144,40 +172,38 @@
                 </div>
             </nav>
 
-            <!-- Main content -->
             <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
                 <div class="pt-3 pb-2 mb-3 border-bottom">
                     <h1 class="h2">Messages</h1>
-                    <p class="text-muted">Connect with alumni for guidance and mentorship</p>
+                    <p class="text-muted">Connect with alumni and teachers for guidance and mentorship</p>
                 </div>
 
                 <div class="chat-container">
                     <div class="row h-100">
-                        <!-- Chat sidebar - alumni list -->
                         <div class="col-md-4 chat-sidebar">
                             <div class="p-3 border-bottom bg-light">
-                                <h6 class="mb-0">
-                                    <i class="fas fa-user-graduate me-2"></i>Alumni Network
-                                </h6>
-                                <small class="text-muted">Connect with experienced professionals</small>
+                                <div class="btn-group-custom">
+                                    <button class="btn-custom active" id="tabAlumni">Alumni</button>
+                                    <button class="btn-custom" id="tabTeachers">Teachers</button>
+                                </div>
+                                <small class="text-muted d-block mt-2">Connect with experienced professionals and educators</small>
                             </div>
                             <div id="usersList">
                                 <div class="text-center py-4">
                                     <div class="spinner-border text-primary" role="status">
                                         <span class="visually-hidden">Loading...</span>
                                     </div>
-                                    <p class="mt-2">Loading alumni...</p>
+                                    <p class="mt-2">Loading contacts...</p>
                                 </div>
                             </div>
                         </div>
                         
-                        <!-- Chat area -->
                         <div class="col-md-8 d-flex flex-column">
                             <div id="chatHeader" class="p-3 border-bottom bg-white">
                                 <div class="d-flex align-items-center">
                                     <div class="user-avatar me-3" id="chatAvatar">A</div>
                                     <div>
-                                        <h5 class="mb-0" id="chatUserName">Select an alumni to start chatting</h5>
+                                        <h5 class="mb-0" id="chatUserName">Select a contact to start chatting</h5>
                                         <small class="text-muted" id="chatUserRole"></small>
                                     </div>
                                 </div>
@@ -186,8 +212,8 @@
                             <div class="messages-container" id="messagesContainer">
                                 <div class="text-center text-muted py-5">
                                     <i class="fas fa-comments fa-3x mb-3 d-block"></i>
-                                    <p>Select an alumni from the left to start chatting</p>
-                                    <small>Alumni are here to help with career advice, mentorship, and guidance</small>
+                                    <p>Select a contact from the left to start chatting</p>
+                                    <small>Alumni and teachers are here to help!</small>
                                 </div>
                             </div>
                             

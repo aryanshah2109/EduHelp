@@ -114,6 +114,27 @@ async def get_all_students_for_chat(
         for student in students
     ]
 
+@router.get("/teachers")
+async def get_all_teachers_for_chat(
+    current_user: models.User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Get all teachers for students to chat with"""
+    if current_user.role not in ["student", "alumni"]:
+        raise HTTPException(status_code=403, detail="Not authorized")
+    
+    teachers = db.query(models.User).filter(models.User.role == "teacher").all()
+    
+    return [
+        {
+            "id": teacher.id,
+            "full_name": teacher.full_name,
+            "username": teacher.username,
+            "email": teacher.email,
+            "role": teacher.role
+        }
+        for teacher in teachers
+    ]
 
 @router.get("/messages/{other_user_id}")
 async def get_messages(

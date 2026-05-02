@@ -21,11 +21,21 @@
             border: none;
             color: #6c757d;
             cursor: pointer;
-            padding: 0;
+            padding: 5px;
             z-index: 10;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
         .password-toggle:hover {
+            background-color: rgba(0,0,0,0.1);
             color: #495057;
+        }
+        .password-toggle:focus {
+            outline: none;
         }
         .role-info {
             font-size: 12px;
@@ -34,6 +44,9 @@
         }
         .role-info i {
             margin-right: 5px;
+        }
+        .password-input-group input {
+            padding-right: 45px !important;
         }
     </style>
 </head>
@@ -126,24 +139,29 @@
             });
         }
         
-        // Password toggle
-        function togglePasswordVisibility(inputId, toggleId) {
-            const passwordInput = document.getElementById(inputId);
-            const toggleBtn = document.getElementById(toggleId);
-            
-            if (passwordInput.type === 'password') {
-                passwordInput.type = 'text';
-                toggleBtn.innerHTML = '<i class="fas fa-eye-slash"></i>';
-            } else {
-                passwordInput.type = 'password';
-                toggleBtn.innerHTML = '<i class="fas fa-eye"></i>';
-            }
-        }
+        // Password toggle functionality - FIXED
+        const togglePasswordBtn = document.getElementById('togglePasswordSignup');
+        const passwordInput = document.getElementById('password');
         
-        const togglePasswordSignup = document.getElementById('togglePasswordSignup');
-        if (togglePasswordSignup) {
-            togglePasswordSignup.addEventListener('click', function() {
-                togglePasswordVisibility('password', 'togglePasswordSignup');
+        if (togglePasswordBtn && passwordInput) {
+            togglePasswordBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                
+                const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+                passwordInput.setAttribute('type', type);
+                
+                // Toggle icon
+                const icon = this.querySelector('i');
+                if (icon) {
+                    if (type === 'text') {
+                        icon.classList.remove('fa-eye');
+                        icon.classList.add('fa-eye-slash');
+                    } else {
+                        icon.classList.remove('fa-eye-slash');
+                        icon.classList.add('fa-eye');
+                    }
+                }
             });
         }
         
